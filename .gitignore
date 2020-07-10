@@ -1,0 +1,8 @@
+.checkpoint
+.yolov3.data*
+.yolov3.weights
+.yolov3.index
+*.swp
+.__pycache__/
+**/__pycache__/
+weights/
