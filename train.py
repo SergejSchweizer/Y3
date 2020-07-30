@@ -14,15 +14,16 @@ from tqdm import tqdm
 from y3.dataset import Dataset
 from y3.yolov3 import YOLOv3, decode, compute_loss
 from y3.config import cfg
+from pandarallel import pandarallel
 
-
-DF_RESULTS = pd.DataFrame(columns=['IMAGE',
+df_map = pd.DataFrame(columns=['IMAGE',
     'CLASS',
     'SCORE',
     'IOU',
     'BBOXPR',
     'BBOXGT'])
 
+pandarallel.initialize()
 
 def test_step(testing_model, files):
     CLASSES      = utils.read_class_names(cfg.YOLO.CLASSES)
@@ -32,10 +33,10 @@ def test_step(testing_model, files):
     for f in files:
         test_filename = f.split(" ")[0]
         test_bboxes_gt = f.split(" ")[1:]
-        global DF_RESULTS
+        global df_map
 
         # delete all entrys of current file from traing_results
-        DF_RESULTS.drop(DF_RESULTS[DF_RESULTS.IMAGE == test_filename].index,inplace=True)
+        df_map.drop(df_map[df_map.IMAGE == test_filename].index,inplace=True)
 
         #print(test_bboxes_gt)
         #print('test_filename {}, test_bboxes: {} '.format(test_filename,test_bboxes_gt))
@@ -58,50 +59,74 @@ def test_step(testing_model, files):
             test_bbox_gt_class  = [ np.array(x.split(',')[:4], dtype=np.int) for x in test_bboxes_gt if int(x.split(',')[4]) == bbox[5] ]
             test_bbox_gt_class_len = len(test_bbox_gt_class)
             test_bbox_class  = [ x for x in bboxes if x[5] == bbox[5] ]
+            # bboxes per image from annotations
             test_bbox_class_len = len(test_bbox_class )
             # compute max iou for current clas
             max_iou_class = max( [ utils.bboxes_iou(bb,bbox[:4]) for bb in test_bbox_gt_class ] or [0] )
         
-            DF_RESULTS = DF_RESULTS.append({'IMAGE':test_filename, # IMAGE
+            df_map = df_map.append({'IMAGE':test_filename, # IMAGE
                     'CLASS':CLASSES[bbox[5]], # CÖASS
                     'SCORE':bbox[4], # SCORE
                     'IOU':max_iou_class, # IOU
                     'BBOXPR':test_bbox_class_len, #BBOXPR
                     'BBOXGT':test_bbox_gt_class_len }, ignore_index=True )    # BBOX
-            #print(DF_RESULTS.size)
+            #print(df_map.size)
             #print('IMG:{}, CLASS:{} SCORE:{} IOU:{} BBOX_COUNT:{} BBOX_GT_COUNT:{}'.format(\
             #        test_filename, CLASSES[bbox[5]], bbox[4],
             #        max_iou_class, test_bbox_class_len,test_bbox_gt_class_len
             #        ))
 
-    if not DF_RESULTS.size == 0:
-        # compute mAP
-        DF_RESULTS = DF_RESULTS.sort_values('SCORE', ascending=False)
-        DF_RESULTS.loc[DF_RESULTS['IOU'] > .5, 'TP'  ] = 1
-        DF_RESULTS.loc[DF_RESULTS['IOU'] < .5, 'TP'  ] = 0
-        DF_RESULTS.loc[DF_RESULTS['IOU'] < .5, 'FP'  ] = 1
-        DF_RESULTS.loc[DF_RESULTS['IOU'] > .5, 'FP'  ] = 0
+    if not df_map.size == 0:
 
-        # TP
-        DF_RESULTS['CUM_TP'] = DF_RESULTS['TP'].cumsum()
-        DF_RESULTS['CUM_FP'] = DF_RESULTS['FP'].cumsum()
-
-        for class_ in DF_RESULTS.CLASS.unique():
-        # cum TP  classes
-            DF_RESULTS['CUM_TP_'+class_] = DF_RESULTS[ DF_RESULTS['CLASS'] == class_]['TP'].dropna().cumsum()
-            DF_RESULTS['CUM_FP_'+class_] = DF_RESULTS[ DF_RESULTS['CLASS'] == class_]['FP'].dropna().cumsum()
-            DF_RESULTS['CUM_GT_'+class_] = DF_RESULTS[ DF_RESULTS['CLASS'] == class_ ].drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum() 
-            #DF_RESULTS['CUM_GT_'+class_] = DF_RESULTS[ DF_RESULTS['CLASS'] == class_ ].drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum() 
-            DF_RESULTS['P_'+class_] = DF_RESULTS['CUM_TP_'+class_] / ( DF_RESULTS['CUM_TP_'+class_] + DF_RESULTS['CUM_FP_'+class_]  )
-            DF_RESULTS['R_'+class_] = DF_RESULTS['CUM_TP_'+class_] / ( DF_RESULTS['CUM_GT_'+class_]   )
-
-
-        # cum TP ground truht
-        DF_RESULTS['CUM_GT']    = DF_RESULTS.drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
-        # precision all
-        DF_RESULTS['P_ALL'] = DF_RESULTS['CUM_TP'] / ( DF_RESULTS['CUM_TP'] + DF_RESULTS['CUM_FP'] )
-        DF_RESULTS['R_ALL']    = DF_RESULTS['CUM_TP'] / ( DF_RESULTS['CUM_GT']  )
-    
+        def gtt(x):
+            return int(x > .5)
+        def ltt(x):
+            return int(x < .5)
+        
+        df_map = df_map.sort_values('SCORE', ascending=False)
+        
+        # TP,FP
+        df_map['TP']  = df_map['IOU'].parallel_map(gtt)
+        df_map['FP']  = df_map['IOU'].parallel_map(ltt)
+        
+        # CUM TP
+        df_map['CUM_TP'] = df_map['TP'].cumsum()
+        df_map['CUM_FP'] = df_map['FP'].cumsum()
+            
+        # bboxes are per image and class from annotations files
+        df_map['CUM_GT']    = df_map.drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
+        #df_map['CUM_GT'] = df_map['BBOXGT'].cumsum()
+        df_map['P_ALL']  = df_map['CUM_TP'] / ( df_map['CUM_TP'] + df_map['CUM_FP'] )
+        df_map['R_ALL']  = df_map['CUM_TP'] / df_map['CUM_GT'] 
+        # same value vor all rows !!!
+        df_map['AUC_ALL'] = np.trapz(df_map['P_ALL'],  df_map['R_ALL'])
+        
+        df_map['CUM_TP_CLASS' ] = df_map.groupby(['CLASS'])['TP'].cumsum()
+        df_map['CUM_FP_CLASS' ] = df_map.groupby(['CLASS'])['FP'].cumsum()
+        
+        for class_ in df_map.CLASS.unique():
+            # CUM_GT_CLASS (gt)
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')] = \
+            df_map.loc[ (df_map.CLASS == class_)].drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum() 
+            
+            # P_CLASS
+            df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')] = \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] / \
+          ( df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] + \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_FP_CLASS') ] )
+        
+            # R_CLASS
+            df_map.loc[ (df_map.CLASS == class_, 'R_CLASS')] = \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] / \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')].max() 
+            
+            
+            df_map.loc[ (df_map.CLASS == class_, 'AUC_CLASS')] = \
+            np.trapz( df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')],\
+                     df_map.loc[ (df_map.CLASS == class_, 'R_CLASS')] )
+        
+        df_map = df_map.sort_values('AUC_CLASS', ascending=False)
+            
 
 def train_step(image_data, target, model, optimizer, global_steps, warmup_steps, writer, total_steps):
     
@@ -167,12 +192,12 @@ def run(args):
         tf.config.experimental.set_visible_devices([], 'GPU')
 
     # copy anno files to curren_run_directory
-    if os.path.exists(cfg.YOLO.DIR+args.train_dir+'/conf'):
-                shutil.rmtree(cfg.YOLO.DIR+args.train_dir+'/conf')
-    shutil.copytree(cfg.YOLO.DIR+'conf', cfg.YOLO.DIR+args.train_dir+'/conf')
+    #if os.path.exists(cfg.YOLO.DIR+args.train_dir+'/conf'):
+    #            shutil.rmtree(cfg.YOLO.DIR+args.train_dir+'/conf')
+    #shutil.copytree(cfg.YOLO.DIR+'conf', cfg.YOLO.DIR+args.train_dir+'/conf')
 
-    trainset = Dataset('train')
-    logdir = cfg.YOLO.DIR+'/'+args.train_dir+'/'+cfg.YOLO.LOG 
+    trainset = Dataset('train', batch_size=args.batch_size)
+    logdir = cfg.TRAIN.LOG_DIR 
     steps_per_epoch = len(trainset)
     global_steps = tf.Variable(1, trainable=False, dtype=tf.int64)
     warmup_steps = cfg.TRAIN.WARMUP_EPOCHS * steps_per_epoch
@@ -210,7 +235,7 @@ def run(args):
 
     # parse arguments
     if args.tld:
-        utils.load_weights(train_model, cfg.YOLO.DIR+'/'+cfg.YOLO.WEIGHTS_LOADED)
+        utils.load_weights(train_model, args.tld)
         freeze_body=1 # 1 = darknet, 2 = all net excet 3 last layers
         num = (185, len(train_model.layers)-3)[freeze_body-1]
         for i in range(num): train_model.layers[i].trainable = False
@@ -219,6 +244,7 @@ def run(args):
     for epoch in range(cfg.TRAIN.EPOCHS):
         tf.print("=> EPOCH %i OF %i STARTED " % (epoch+1, cfg.TRAIN.EPOCHS))
 
+        all_files = []
         # for batchsize
         for image_data, target, files in trainset:
 
@@ -232,20 +258,24 @@ def run(args):
                       total_steps
                       )
 
+            all_files.extend(files)
+
             # save weights after each batchsize
-            train_model.save_weights(cfg.YOLO.DIR+'/'+args.train_dir+'/'+cfg.YOLO.WEIGHTS_COMPUTED)
+            train_model.save_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
 
-            if args.map:
-                # if compute mAP
-                testing_model.load_weights(cfg.YOLO.DIR+'/'+args.train_dir+'/'+cfg.YOLO.WEIGHTS_COMPUTED)
-                test_step(testing_model, files) 
+    # after all epochs 
+    if args.map:
+        # if compute mAP
+        testing_model.load_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
+        test_step(testing_model, all_files) 
 
-                utils.plot_map(cfg.TRAIN.BATCH_SIZE,
-                    epoch,
-                    steps_per_epoch*cfg.TRAIN.BATCH_SIZE,
-                    DF_RESULTS,
-                    cfg.YOLO.DIR+args.train_dir+'/metrics/mAP.png')
+        utils.plot_map(cfg.TRAIN.BATCH_SIZE,
+            epoch,
+            steps_per_epoch*cfg.TRAIN.BATCH_SIZE,
+            df_map,
+            cfg.TRAIN.METRICS_DIR+'train_mAP.png',
+            10)
       
-                DF_RESULTS.to_csv(cfg.YOLO.DIR+args.train_dir+'/metrics/mAP.csv')
+        df_map.to_csv(cfg.TRAIN.METRICS_DIR+'train_mAP.csv')
 
             

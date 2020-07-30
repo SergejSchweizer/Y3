@@ -13,12 +13,19 @@ from y3.config import cfg
 
 class Dataset(object):
     """implement Dataset here"""
-    def __init__(self, dataset_type):
-        self.annot_path  = cfg.TRAIN.ANNOT_PATH if dataset_type == 'train' else cfg.TEST.ANNOT_PATH
+    def __init__(
+            self
+            ,dataset_type
+            ,batch_size=None):
+
+        self.annot_dir  = cfg.TRAIN.ANNOT_DIR if dataset_type == 'train' else cfg.TEST.ANNOT_DIR
         self.input_sizes = cfg.TRAIN.INPUT_SIZE if dataset_type == 'train' else cfg.TEST.INPUT_SIZE
-        self.batch_size  = cfg.TRAIN.BATCH_SIZE if dataset_type == 'train' else cfg.TEST.BATCH_SIZE
         self.data_aug    = cfg.TRAIN.DATA_AUG   if dataset_type == 'train' else cfg.TEST.DATA_AUG
 
+        if batch_size:
+            self.batch_size = int(batch_size)
+        else:
+            self.batch_size  = cfg.TRAIN.BATCH_SIZE if dataset_type == 'train' else cfg.TEST.BATCH_SIZE
         self.train_input_sizes = cfg.TRAIN.INPUT_SIZE
         self.strides = np.array(cfg.YOLO.STRIDES)
         self.classes = utils.read_class_names(cfg.YOLO.CLASSES)
@@ -34,7 +41,7 @@ class Dataset(object):
 
 
     def load_annotations(self, dataset_type):
-        with open(self.annot_path, 'r') as f:
+        with open(self.annot_dir+'train.txt', 'r') as f:
             txt = f.readlines()
             annotations = [line.strip() for line in txt if len(line.strip().split()[1:]) != 0]
         np.random.shuffle(annotations)
@@ -254,6 +261,7 @@ class Dataset(object):
                 bbox_ind = int(bbox_count[best_detect] % self.max_bbox_per_scale)
                 bboxes_xywh[best_detect][bbox_ind, :4] = bbox_xywh
                 bbox_count[best_detect] += 1
+
         label_sbbox, label_mbbox, label_lbbox = label
         sbboxes, mbboxes, lbboxes = bboxes_xywh
         return label_sbbox, label_mbbox, label_lbbox, sbboxes, mbboxes, lbboxes

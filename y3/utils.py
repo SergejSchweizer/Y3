@@ -19,41 +19,54 @@ YOLO_V3_LAYERS = [
     ]
 
 
-def plot_map(batch_size, epoch, train_size, df_results, path):
+def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
 
+    if ( 'R_ALL' in df_map.columns\
+        and 'P_ALL' in df_map.columns \
+        and len(df_map.index.values) != 0 ):
 
-    if 'R_ALL' in df_results and 'P_ALL' in df_results:
+    
+    
+        classes_list = []
+        classes_list.extend(list(df_map[df_map['AUC_CLASS'] > 0].CLASS.unique()[:num_classes]))
+        classes_list.extend(list(df_map[df_map['AUC_CLASS'] > 0].CLASS.unique()[-num_classes:]))
+                
+        # main plot
         fig, ax = plt.subplots()
+        ax1 = df_map.plot.scatter(x='R_ALL',y='P_ALL', ax=ax, color='red', figsize=(25,15),  
+            label="all classes, AUC: %.3f, P: %.3f, R: %.3f" % ( 
+            df_map['AUC_ALL'].iloc[-1],
+            df_map['P_ALL'].iloc[-1],
+            df_map['R_ALL'].iloc[-1]),
+            linestyle='-',
+            linewidth=0.1,
+            marker='.', 
+            grid=True
+            )
 
-        ax = df_results.plot(kind='scatter',x='R_ALL',y='P_ALL',ax=ax, color='red', figsize=(15,10),  
-           label="all classes, AUC: %.3f, P: %.3f, R: %.3f" % ( 
-               np.trapz(df_results['P_ALL'],df_results['R_ALL']),
-               df_results['P_ALL'].iloc[-1],
-               df_results['R_ALL'].iloc[-1] ),
-               linestyle='-',
-               linewidth=0.1,
-               marker='.', 
-               grid=True
-               )
-        for class_ in df_results.CLASS.unique():
-
-            if df_results['P_'+class_].sum() > 0:
-
-                ax = df_results.plot(kind='scatter',x='R_'+class_,y='P_'+class_, ax=ax, color=np.random.rand(3,).reshape(1,-1), figsize=(15,10), 
-                label="class: %s, AUC: %.3f P: %.3f, R: %.3f" % (class_, 
-                np.trapz(df_results['P_'+class_].dropna(),df_results['R_'+class_].dropna() ), 
-                df_results[ df_results['CLASS'] == class_]['P_'+class_].iloc[-1],
-                df_results[ df_results['CLASS'] == class_]['R_'+class_].iloc[-1] ),  
-                title='mean Average Precision (Batch:{}, Epoch:{}, Train size:{}) '.format(batch_size,epoch+1,train_size) , 
-                linestyle='-', 
-                marker='.', 
-                grid=True
-                )
-
+     
+        
+        for class_ in classes_list:
+              
+            if df_map.loc[ (df_map.CLASS == class_, 'AUC_CLASS')].sum() > 0:
+                ax  = df_map.loc[ (df_map.CLASS == class_) ].plot(kind='scatter',
+                      x='R_CLASS',
+                      y='P_CLASS', 
+                      ax=ax, color=np.random.rand(3,).reshape(1,-1),
+                      figsize=(25,15),
+                      label="class: %s, AUC: %.3f P: %.3f, R: %.3f" % ( class_, 
+                      df_map[ df_map['CLASS'] == class_]['AUC_CLASS'].iloc[-1], 
+                      df_map[ df_map['CLASS'] == class_]['P_CLASS'].iloc[-1],
+                      df_map[ df_map['CLASS'] == class_]['R_CLASS'].iloc[-1] ), 
+                      title='mean Average Precision (Batch:{}, Epoch:{})'.format(BATCH_SIZE, EPOCH) , 
+                      linestyle='-',
+                      linewidth=0.1,
+                      marker='.', 
+                      grid=True)
+            
         
         ax.set_xlabel("Recall")
         ax.set_ylabel("Precision")
-        #plt.show()
         plt.savefig(path)
         plt.close()
 
@@ -343,7 +356,4 @@ def postprocess_boxes(pred_bbox, org_img_shape, input_size, score_threshold):
     coors, scores, classes = pred_coor[mask], scores[mask], classes[mask]
 
     return np.concatenate([coors, scores[:, np.newaxis], classes[:, np.newaxis]], axis=-1)
-
-
-
 
