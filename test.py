@@ -5,14 +5,25 @@ import cv2
 import os
 import shutil
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import y3.utils as utils
 from y3.config import cfg
 from y3.yolov3 import YOLOv3, decode
 
 
+df_map = pd.DataFrame(columns=['IMAGE',
+    'CLASS',
+    'SCORE',
+    'IOU',
+    'BBOXPR',
+    'BBOXGT'])
+
+
 
 def run(args):
+   
+    global df_map
 
     if args.gpu:
         gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -31,18 +42,19 @@ def run(args):
     INPUT_SIZE   = cfg.TEST.INPUT_SIZE 
     NUM_CLASS    = len(utils.read_class_names(cfg.YOLO.CLASSES))
     CLASSES      = utils.read_class_names(cfg.YOLO.CLASSES)
+    TRAIN_SIZE   = len(open(cfg.TRAIN.ANNOT_DIR+'train.txt').readlines())
 
-    predicted_dir_path = cfg.YOLO.DIR+args.train_dir+'/'+cfg.TEST.CLASSIFIED_STATS
-    ground_truth_dir_path = cfg.YOLO.DIR+args.train_dir+'/'+cfg.TEST.GROUNDTRUTH_STATS
-    detected_images_dir_path = cfg.YOLO.DIR+args.train_dir+'/'+cfg.TEST.CLASSIFIED_IMAGE_DIR
+    classified_stats_dir = cfg.TEST.CLASSIFIED_STATS_DIR
+    groundtruth_stats_dir = cfg.TEST.GROUNDTRUTH_STATS_DIR
+    classified_image_dir = cfg.TEST.CLASSIFIED_IMAGE_DIR
 
-    if os.path.exists(predicted_dir_path): shutil.rmtree(predicted_dir_path)
-    if os.path.exists(ground_truth_dir_path): shutil.rmtree(ground_truth_dir_path)
-    if os.path.exists(detected_images_dir_path): shutil.rmtree(detected_images_dir_path )
+    if os.path.exists(classified_stats_dir): shutil.rmtree(classified_stats_dir)
+    if os.path.exists(groundtruth_stats_dir): shutil.rmtree(groundtruth_stats_dir)
+    if os.path.exists(classified_image_dir): shutil.rmtree(classified_image_dir )
 
-    os.makedirs(predicted_dir_path)
-    os.makedirs(ground_truth_dir_path)
-    os.makedirs(detected_images_dir_path)
+    os.makedirs(classified_stats_dir)
+    os.makedirs(groundtruth_stats_dir)
+    os.makedirs(classified_image_dir)
 
     # Build Model
     input_layer  = tf.keras.layers.Input([INPUT_SIZE, INPUT_SIZE, 3])
@@ -54,7 +66,7 @@ def run(args):
         bbox_tensors.append(bbox_tensor)
 
     model = tf.keras.Model(input_layer, bbox_tensors)
-    model.load_weights(cfg.YOLO.DIR+args.train_dir+'/'+cfg.YOLO.WEIGHTS_COMPUTED)
+    model.load_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
 
     with open(cfg.TEST.ANNOT_PATH, 'r') as annotation_file:
         for num, line in enumerate(annotation_file):
@@ -65,6 +77,8 @@ def run(args):
             image = cv2.imread(image_path)
             #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # gives blue filter
             bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[1:]])
+            test_filename = line.split(" ")[0]
+            test_bboxes_gt = line.split(" ")[1:]
 
 
             if len(bbox_data_gt) == 0:
@@ -72,7 +86,7 @@ def run(args):
                 classes_gt=[]
             else:
                 bboxes_gt, classes_gt = bbox_data_gt[:, :4], bbox_data_gt[:, 4]
-            ground_truth_path = os.path.join(ground_truth_dir_path, str(num) + '.txt')
+            ground_truth_path = os.path.join(groundtruth_stats_dir, str(num) + '.txt')
 
             print('=> ground truth of %s:' % image_name)
             num_bbox_gt = len(bboxes_gt)
@@ -86,7 +100,7 @@ def run(args):
 
 
             print('=> predict result of %s:' % image_name)
-            predict_result_path = os.path.join(predicted_dir_path, image_name[:-4] + '.txt')
+            predict_result_path = os.path.join(classified_stats_dir, image_name[:-4] + '.txt')
             # Predict Process
             image_size = image.shape[:2]
             image_data = utils.image_preporcess(np.copy(image), [INPUT_SIZE, INPUT_SIZE])
@@ -98,9 +112,9 @@ def run(args):
             bboxes = utils.postprocess_boxes(pred_bbox, image_size, INPUT_SIZE, cfg.TEST.SCORE_THRESHOLD)
             bboxes = utils.nms(bboxes, cfg.TEST.IOU_THRESHOLD, method='nms')
 
-            if cfg.YOLO.DIR+'/'+args.train_dir+'/'+cfg.TEST.CLASSIFIED_IMAGE_DIR is not None:
+            if cfg.TEST.CLASSIFIED_IMAGE_DIR is not None:
                 image = utils.draw_bbox(image, bboxes)
-                cv2.imwrite(detected_images_dir_path+'/'+image_name, image)
+                cv2.imwrite(classified_image_dir+'/'+image_name, image)
 
             with open(predict_result_path, 'w') as f:
                 for bbox in bboxes:
@@ -109,9 +123,38 @@ def run(args):
                     class_ind = int(bbox[5])
                     class_name = CLASSES[class_ind]
                     score = '%.4f' % score
-                    #score = 'c: {}, iou: {}'.format(score,iou)
                     xmin, ymin, xmax, ymax = list(map(str, coor))
                     bbox_mess = ' '.join([image_path, class_name, xmin, ymin, xmax, ymax, score]) + '\n'
                     f.write(bbox_mess)
                     print('\t' + str(bbox_mess).strip())
+                     
 
+                    # save metrics
+                    test_bbox_gt_class  = [ np.array(x.split(',')[:4], dtype=np.int) \
+                            for x in test_bboxes_gt if int(x.split(',')[4]) == bbox[5] ]
+                    test_bbox_gt_class_len = len(test_bbox_gt_class)
+                    test_bbox_class  = [ x for x in bboxes if x[5] == bbox[5] ]
+                    # bboxes per image from annotations
+                    test_bbox_class_len = len(test_bbox_class )
+                    # compute max iou for current clas
+                    max_iou_class = max( [ utils.bboxes_iou(bb,bbox[:4]) for bb in test_bbox_gt_class ] or [0]     )
+
+
+                    df_map = df_map.append({
+                        'IMAGE':test_filename, # IMAGE
+                        'CLASS':class_name , # CÖASS
+                        'SCORE':bbox[4], # SCORE
+                        'IOU':max_iou_class, # IOU
+                        'BBOXPR':test_bbox_class_len, #BBOXPR
+                        'BBOXGT':test_bbox_gt_class_len }, ignore_index=True )    # BBOX
+
+
+    df_map = utils.preprocess_map(df_map, tp_th=0.5)
+    utils.plot_map(cfg.TRAIN.BATCH_SIZE,
+        cfg.TRAIN.EPOCHS,
+        TRAIN_SIZE,
+        df_map,
+        cfg.TRAIN.METRICS_DIR+'test_mAP.png',
+        10)
+    
+    df_map.to_csv(cfg.TRAIN.METRICS_DIR+'test_mAP.csv')

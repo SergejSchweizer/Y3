@@ -6,7 +6,10 @@ import random
 import colorsys
 import numpy as np
 from y3.config import cfg
+from pandarallel import pandarallel
 import matplotlib.pyplot as plt
+
+pandarallel.initialize()
 
 YOLO_V3_LAYERS = [
     'yolo_darknet',
@@ -18,6 +21,54 @@ YOLO_V3_LAYERS = [
     'yolo_output_2',
     ]
 
+def preprocess_map(df_map, tp_th=0.5):
+
+    if not df_map.size == 0:
+        def gtt(x):
+            return int(x > tp_th) 
+        def ltt(x):
+            return int(x < tp_th) 
+                                                    
+        df_map = df_map.sort_values('SCORE', ascending=False)
+                                                                
+        # TP,FP
+        df_map['TP']  = df_map['IOU'].parallel_map(gtt)
+        df_map['FP']  = df_map['IOU'].parallel_map(ltt)
+                                                                                            
+        # CUM TP
+        df_map['CUM_TP'] = df_map['TP'].cumsum()
+        df_map['CUM_FP'] = df_map['FP'].cumsum()
+                                                                                                              # bboxes are per image and class from annotations files
+        df_map['CUM_GT']    = df_map.drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
+        df_map['P_ALL']  = df_map['CUM_TP'] / ( df_map['CUM_TP'] + df_map['CUM_FP'] )
+        df_map['R_ALL']  = df_map['CUM_TP'] / df_map['CUM_GT'] 
+        
+        df_map['AUC_ALL'] = np.trapz(df_map['P_ALL'],  df_map['R_ALL'])
+
+        df_map['CUM_TP_CLASS' ] = df_map.groupby(['CLASS'])['TP'].cumsum()
+        df_map['CUM_FP_CLASS' ] = df_map.groupby(['CLASS'])['FP'].cumsum()
+
+        for class_ in df_map.CLASS.unique():
+            # CUM_GT_CLASS (gt)
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')] = \
+            df_map.loc[ (df_map.CLASS == class_)].drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
+            # P_CLASS
+            df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')] = \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] / \
+            ( df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] + \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_FP_CLASS') ] )
+
+            # R_CLASS
+            df_map.loc[ (df_map.CLASS == class_, 'R_CLASS')] = \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] / \
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')].max()
+
+            df_map.loc[ (df_map.CLASS == class_, 'AUC_CLASS')] = \
+            np.trapz( df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')],\
+            df_map.loc[ (df_map.CLASS == class_, 'R_CLASS')] )
+
+        df_map = df_map.sort_values('AUC_CLASS', ascending=False)
+        return df_map
 
 def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
 
@@ -58,7 +109,7 @@ def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
                       df_map[ df_map['CLASS'] == class_]['AUC_CLASS'].iloc[-1], 
                       df_map[ df_map['CLASS'] == class_]['P_CLASS'].iloc[-1],
                       df_map[ df_map['CLASS'] == class_]['R_CLASS'].iloc[-1] ), 
-                      title='mean Average Precision (Batch:{}, Epoch:{})'.format(BATCH_SIZE, EPOCH) , 
+                      title='mean Average Precision (Batch:{}, Epoch:{})'.format(batch_size, epoch), 
                       linestyle='-',
                       linewidth=0.1,
                       marker='.', 
