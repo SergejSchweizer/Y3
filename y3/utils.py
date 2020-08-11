@@ -40,6 +40,7 @@ def preprocess_map(df_map, tp_th=0.5):
         df_map['CUM_FP'] = df_map['FP'].cumsum()
                                                                                                               # bboxes are per image and class from annotations files
         df_map['CUM_GT']    = df_map.drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
+
         df_map['P_ALL']  = df_map['CUM_TP'] / ( df_map['CUM_TP'] + df_map['CUM_FP'] )
         df_map['R_ALL']  = df_map['CUM_TP'] / df_map['CUM_GT'] 
         
@@ -52,6 +53,7 @@ def preprocess_map(df_map, tp_th=0.5):
             # CUM_GT_CLASS (gt)
             df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')] = \
             df_map.loc[ (df_map.CLASS == class_)].drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
+
             # P_CLASS
             df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')] = \
             df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] / \
@@ -61,7 +63,7 @@ def preprocess_map(df_map, tp_th=0.5):
             # R_CLASS
             df_map.loc[ (df_map.CLASS == class_, 'R_CLASS')] = \
             df_map.loc[ (df_map.CLASS == class_, 'CUM_TP_CLASS') ] / \
-            df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')].max()
+            df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')]
 
             df_map.loc[ (df_map.CLASS == class_, 'AUC_CLASS')] = \
             np.trapz( df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')],\
@@ -77,47 +79,54 @@ def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
         and len(df_map.index.values) != 0 ):
 
     
-    
+        df_map = df_map.sort_values('AUC_CLASS', ascending=False)
+	    
+        legends_list = []
         classes_list = []
         classes_list.extend(list(df_map[df_map['AUC_CLASS'] > 0].CLASS.unique()[:num_classes]))
         classes_list.extend(list(df_map[df_map['AUC_CLASS'] > 0].CLASS.unique()[-num_classes:]))
-                
-        # main plot
-        fig, ax = plt.subplots()
-        ax1 = df_map.plot.scatter(x='R_ALL',y='P_ALL', ax=ax, color='red', figsize=(25,15),  
-            label="all classes, AUC: %.3f, P: %.3f, R: %.3f" % ( 
-            df_map['AUC_ALL'].iloc[-1],
-            df_map['P_ALL'].iloc[-1],
-            df_map['R_ALL'].iloc[-1]),
-            linestyle='-',
-            linewidth=0.1,
-            marker='.', 
-            grid=True
-            )
-
-     
-        
+        #print(classes_list)
+        #classes_list = list(set( classes_list))
+        #print(classes_list)
+	    
+        df_map = df_map.sort_values('SCORE', ascending=False)
+	    
+        plt.figure(figsize=(25,15))
+        plt.plot('R_ALL'
+        ,'P_ALL'
+        ,'r-o'
+        ,data=df_map
+        )
+	    
+        legends_list.extend(["class: %s, AUC: %.3f P: %.3f, R: %.3f" % ('all'
+            ,df_map['AUC_CLASS'].iloc[-1] 
+            ,df_map['P_CLASS'].iloc[-1]
+            ,df_map['R_CLASS'].iloc[-1] 
+                          )]
+             )
+	      
         for class_ in classes_list:
-              
             if df_map.loc[ (df_map.CLASS == class_, 'AUC_CLASS')].sum() > 0:
-                ax  = df_map.loc[ (df_map.CLASS == class_) ].plot(kind='scatter',
-                      x='R_CLASS',
-                      y='P_CLASS', 
-                      ax=ax, color=np.random.rand(3,).reshape(1,-1),
-                      figsize=(25,15),
-                      label="class: %s, AUC: %.3f P: %.3f, R: %.3f" % ( class_, 
-                      df_map[ df_map['CLASS'] == class_]['AUC_CLASS'].iloc[-1], 
-                      df_map[ df_map['CLASS'] == class_]['P_CLASS'].iloc[-1],
-                      df_map[ df_map['CLASS'] == class_]['R_CLASS'].iloc[-1] ), 
-                      title='mean Average Precision (Batch:{}, Epoch:{})'.format(batch_size, epoch), 
-                      linestyle='-',
-                      linewidth=0.1,
-                      marker='.', 
-                      grid=True)
-            
-        
-        ax.set_xlabel("Recall")
-        ax.set_ylabel("Precision")
+                plt.plot(
+                df_map[ df_map['CLASS'] == class_]['R_CLASS'].values
+                ,df_map[ df_map['CLASS'] == class_]['P_CLASS'].values
+                ,'-o'
+                ,label = class_
+                )
+
+                legends_list.extend(["class: %s, AUC: %.3f P: %.3f, R: %.3f" % ( class_
+                    ,df_map[ df_map['CLASS'] == class_]['AUC_CLASS'].iloc[-1] 
+                    ,df_map[ df_map['CLASS'] == class_]['P_CLASS'].iloc[-1]
+                    ,df_map[ df_map['CLASS'] == class_]['R_CLASS'].iloc[-1] 
+                    )]
+                )
+		    
+        plt.title('mean Average Precision (Batch:{}, Epoch:{})'.format(batch_size, epoch))        
+        plt.legend(legends_list)        
+        plt.grid(True)
+        plt.xlabel("Recall")
+        plt.ylabel("Precision")
+        #plt.show()
         plt.savefig(path)
         plt.close()
 

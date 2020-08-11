@@ -3,6 +3,7 @@
 
 import os
 import time
+import math
 import shutil
 import numpy as np
 import pandas as pd
@@ -71,8 +72,9 @@ def test_step(testing_model, files, df_map):
 
     return df_map        
     
-def train_step(image_data, target, model, optimizer, global_steps, warmup_steps, writer, total_steps):
+def train_step(image_data, target, model, optimizer, global_steps, warmup_steps, writer, total_steps, epoch):
     
+    global df_map
 
     with tf.GradientTape() as tape:
         pred_result = model(image_data, training=True)
@@ -93,9 +95,9 @@ def train_step(image_data, target, model, optimizer, global_steps, warmup_steps,
    
         gradients = tape.gradient(total_loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        tf.print("=> STEP %4d   lr: %2.6f   giou_loss: %4.4f   conf_loss: %4.4f   "
+        tf.print("=> EPOCH:%1.0f STEP %4d   lr: %2.6f   giou_loss: %4.4f   conf_loss: %4.4f   "
             "prob_loss: %4.4f   total_loss: %4.4f " \
-                %(global_steps, optimizer.lr.numpy(),giou_loss, conf_loss, prob_loss, total_loss) )
+                %(epoch, global_steps, optimizer.lr.numpy(),giou_loss, conf_loss, prob_loss, total_loss) )
                   
 
         # update learning rate
@@ -117,7 +119,7 @@ def train_step(image_data, target, model, optimizer, global_steps, warmup_steps,
             tf.summary.scalar("loss/prob_loss", prob_loss, step=global_steps)
 
         writer.flush()
-
+        return total_loss
 
 
 def run(args):
@@ -192,20 +194,22 @@ def run(args):
         # for batchsize
         for image_data, target, files in trainset:
 
-            train_step(image_data, 
+            total_loss =train_step(image_data, 
                       target, 
                       train_model, 
                       optimizer, 
                       global_steps, 
                       warmup_steps,
                       writer,
-                      total_steps
+                      total_steps,
+                      epoch+1
                       )
 
             all_files.extend(files)
 
-        # save weights after each epoch 
-        train_model.save_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
+        # save weights after each epoch
+        if not math.isnan(total_loss):
+            train_model.save_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
 
     # after all epochs 
     if args.map:

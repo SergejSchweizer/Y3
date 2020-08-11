@@ -155,6 +155,6 @@ def run(args):
         TRAIN_SIZE,
         df_map,
         cfg.TRAIN.METRICS_DIR+'test_mAP.png',
-        10)
+        20)
     
     df_map.to_csv(cfg.TRAIN.METRICS_DIR+'test_mAP.csv')
