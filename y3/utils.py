@@ -72,7 +72,7 @@ def preprocess_map(df_map, tp_th=0.5):
         df_map = df_map.sort_values('AUC_CLASS', ascending=False)
         return df_map
 
-def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
+def plot_map(df_map, path, num_classes, uniq_classes ):
 
     if ( 'R_ALL' in df_map.columns\
         and 'P_ALL' in df_map.columns \
@@ -85,9 +85,7 @@ def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
         classes_list = []
         classes_list.extend(list(df_map[df_map['AUC_CLASS'] > 0].CLASS.unique()[:num_classes]))
         classes_list.extend(list(df_map[df_map['AUC_CLASS'] > 0].CLASS.unique()[-num_classes:]))
-        #print(classes_list)
-        #classes_list = list(set( classes_list))
-        #print(classes_list)
+        classes_list = sorted(set(classes_list), key=lambda x: classes_list.index(x))
 	    
         df_map = df_map.sort_values('SCORE', ascending=False)
 	    
@@ -96,12 +94,16 @@ def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
         ,'P_ALL'
         ,'r-o'
         ,data=df_map
+        ,linewidth=0.1
+        ,markersize=2
         )
 	    
-        legends_list.extend(["class: %s, AUC: %.3f P: %.3f, R: %.3f" % ('all'
-            ,df_map['AUC_CLASS'].iloc[-1] 
-            ,df_map['P_CLASS'].iloc[-1]
-            ,df_map['R_CLASS'].iloc[-1] 
+        legends_list.extend(["class: %s, AUC: %.3f P: %.3f, R: %.3f, C: %s" % ('all'
+            ,df_map['AUC_ALL'].iloc[-1] 
+            ,df_map['P_ALL'].iloc[-1]
+            ,df_map['R_ALL'].iloc[-1]
+            ,df_map.size
+
                           )]
              )
 	      
@@ -112,16 +114,19 @@ def plot_map(batch_size, epoch, train_size, df_map, path, num_classes):
                 ,df_map[ df_map['CLASS'] == class_]['P_CLASS'].values
                 ,'-o'
                 ,label = class_
+                ,linewidth=0.1
+                ,markersize=2
                 )
 
-                legends_list.extend(["class: %s, AUC: %.3f P: %.3f, R: %.3f" % ( class_
+                legends_list.extend(["class: %s, AUC: %.3f P: %.3f, R: %.3f, C: %s" % ( class_
                     ,df_map[ df_map['CLASS'] == class_]['AUC_CLASS'].iloc[-1] 
                     ,df_map[ df_map['CLASS'] == class_]['P_CLASS'].iloc[-1]
-                    ,df_map[ df_map['CLASS'] == class_]['R_CLASS'].iloc[-1] 
+                    ,df_map[ df_map['CLASS'] == class_]['R_CLASS'].iloc[-1]
+                    ,df_map[ df_map['CLASS'] == class_].size 
                     )]
                 )
 		    
-        plt.title('mean Average Precision (Batch:{}, Epoch:{})'.format(batch_size, epoch))        
+        plt.title('mean Average Precision. ({} best and worst classes of {} based on AUC)'.format(len(classes_list),uniq_classes))        
         plt.legend(legends_list)        
         plt.grid(True)
         plt.xlabel("Recall")

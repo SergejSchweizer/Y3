@@ -150,11 +150,10 @@ def run(args):
 
 
     df_map = utils.preprocess_map(df_map, tp_th=0.5)
-    utils.plot_map(cfg.TRAIN.BATCH_SIZE,
-        cfg.TRAIN.EPOCHS,
-        TRAIN_SIZE,
-        df_map,
+    utils.plot_map(df_map, 
         cfg.TRAIN.METRICS_DIR+'test_mAP.png',
-        20)
+        10,
+        NUM_CLASS 
+        )
     
     df_map.to_csv(cfg.TRAIN.METRICS_DIR+'test_mAP.csv')

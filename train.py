@@ -148,6 +148,7 @@ def run(args):
     global_steps = tf.Variable(1, trainable=False, dtype=tf.int64)
     warmup_steps = cfg.TRAIN.WARMUP_EPOCHS * steps_per_epoch
     total_steps = cfg.TRAIN.EPOCHS * steps_per_epoch
+    testset=open(cfg.TRAIN.ANNOT_DIR+'test.txt').read().splitlines()
 
     training_input_tensor = tf.keras.layers.Input([
         cfg.TRAIN.INPUT_SIZE[0],cfg.TRAIN.INPUT_SIZE[0],3])
@@ -193,7 +194,6 @@ def run(args):
         all_files = []
         # for batchsize
         for image_data, target, files in trainset:
-
             total_loss =train_step(image_data, 
                       target, 
                       train_model, 
@@ -211,21 +211,31 @@ def run(args):
         if not math.isnan(total_loss):
             train_model.save_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
 
-    # after all epochs 
-    if args.map:
-        # if compute mAP
-        testing_model.load_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
-        
-        df_map = test_step(testing_model, all_files, df_map) 
-        df_map = utils.preprocess_map(df_map, tp_th=0.5)
 
-        utils.plot_map(cfg.TRAIN.BATCH_SIZE,
-            cfg.TRAIN.EPOCHS,
-            steps_per_epoch*cfg.TRAIN.BATCH_SIZE,
-            df_map,
-            cfg.TRAIN.METRICS_DIR+'train_mAP.png',
-            10)
-      
-        df_map.to_csv(cfg.TRAIN.METRICS_DIR+'train_mAP.csv')
+            # after each epochs 
+            if args.map:
+	        # if compute mAP
+                testing_model.load_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
+	
+                df_map = test_step(testing_model, testset, df_map) 
+                df_map = utils.preprocess_map(df_map, tp_th=0.5)
+
+                if df_map is not None:
+                    map_filename = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_test_mAP'.format(
+                        epoch+1
+                        ,args.warmupepochs
+                        ,args.epochs
+                        ,len(trainset)
+                        ,len(testset)
+                        ,args.batchsize
+                        )
+
+                    utils.plot_map(df_map,
+                        cfg.TRAIN.METRICS_DIR+map_filename+'.png',
+                        10,
+                        len(utils.read_class_names(cfg.YOLO.CLASSES))
+                        )
+ 
+                    df_map.to_csv(cfg.TRAIN.METRICS_DIR+map_filename+'.csv')
 
             
