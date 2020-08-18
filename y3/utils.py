@@ -196,6 +196,7 @@ def load_weights(model, weights_file):
     j = 0
     for i in range(75):
         conv_layer_name = 'conv2d_%d' %i if i > 0 else 'conv2d'
+        #print(model.layers[1].name)
         #print(conv_layer_name)
         bn_layer_name = 'batch_normalization_%d' %j if j > 0 else 'batch_normalization'
 

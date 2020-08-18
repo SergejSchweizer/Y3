@@ -15,7 +15,7 @@ ANCHORS         = utils.get_anchors(cfg.YOLO.ANCHORS)
 STRIDES         = np.array(cfg.YOLO.STRIDES)
 IOU_LOSS_THRESH = cfg.YOLO.IOU_LOSS_THRESH
 
-def YOLOv3(input_layer):
+def YOLOv3(input_layer, num_classes):
     route_1, route_2, conv = backbone.darknet53(input_layer)
 
     conv = common.convolutional(conv, (1, 1, 1024,  512))
@@ -25,7 +25,7 @@ def YOLOv3(input_layer):
     conv = common.convolutional(conv, (1, 1, 1024,  512))
 
     conv_lobj_branch = common.convolutional(conv, (3, 3, 512, 1024))
-    conv_lbbox = common.convolutional(conv_lobj_branch, (1, 1, 1024, 3*(NUM_CLASS + 5)), activate=False, bn=False)
+    conv_lbbox = common.convolutional(conv_lobj_branch, (1, 1, 1024, 3*(num_classes + 5)), activate=False, bn=False)
 
     conv = common.convolutional(conv, (1, 1,  512,  256))
     conv = common.upsample(conv)
@@ -39,7 +39,7 @@ def YOLOv3(input_layer):
     conv = common.convolutional(conv, (1, 1, 512, 256))
 
     conv_mobj_branch = common.convolutional(conv, (3, 3, 256, 512))
-    conv_mbbox = common.convolutional(conv_mobj_branch, (1, 1, 512, 3*(NUM_CLASS + 5)), activate=False, bn=False)
+    conv_mbbox = common.convolutional(conv_mobj_branch, (1, 1, 512, 3*(num_classes + 5)), activate=False, bn=False)
 
     conv = common.convolutional(conv, (1, 1, 256, 128))
     conv = common.upsample(conv)
@@ -53,11 +53,11 @@ def YOLOv3(input_layer):
     conv = common.convolutional(conv, (1, 1, 256, 128))
 
     conv_sobj_branch = common.convolutional(conv, (3, 3, 128, 256))
-    conv_sbbox = common.convolutional(conv_sobj_branch, (1, 1, 256, 3*(NUM_CLASS +5)), activate=False, bn=False)
+    conv_sbbox = common.convolutional(conv_sobj_branch, (1, 1, 256, 3*(num_classes +5)), activate=False, bn=False)
 
     return [conv_sbbox, conv_mbbox, conv_lbbox]
 
-def decode(conv_output, i=0):
+def decode(conv_output, i=0, num_classes=80):
     """
     return tensor of shape [batch_size, output_size, output_size, anchor_per_scale, 5 + num_classes]
             contains (x, y, w, h, score, probability)
@@ -67,7 +67,7 @@ def decode(conv_output, i=0):
     batch_size       = conv_shape[0]
     output_size      = conv_shape[1]
 
-    conv_output = tf.reshape(conv_output, (batch_size, output_size, output_size, 3, 5 + NUM_CLASS))
+    conv_output = tf.reshape(conv_output, (batch_size, output_size, output_size, 3, 5 + num_classes))
 
     conv_raw_dxdy = conv_output[:, :, :, :, 0:2]
     conv_raw_dwdh = conv_output[:, :, :, :, 2:4]

@@ -11,6 +11,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import cv2
 import y3.utils as utils
+import test
 from tqdm import tqdm
 from y3.dataset import Dataset
 from y3.yolov3 import YOLOv3, decode, compute_loss
@@ -29,11 +30,17 @@ pandarallel.initialize()
 def test_step(testing_model, files, df_map):
 
     CLASSES      = utils.read_class_names(cfg.YOLO.CLASSES)
-  
+    #classified_image_dir = cfg.TEST.CLASSIFIED_IMAGE_DIR
+    #classified_stats_dir = cfg.TEST.CLASSIFIED_STATS_DIR
+    #groundtruth_stats_dir = cfg.TEST.GROUNDTRUTH_STATS_DIR
+
     # run model for metrics collections
     for f in files:
         test_filename = f.split(" ")[0]
         test_bboxes_gt = f.split(" ")[1:]
+
+        predict_result_path = os.path.join(classified_stats_dir, image_name[:-4] + '.txt')
+
 
         # delete all entrys of current file from traing_results
         df_map.drop(df_map[df_map.IMAGE == test_filename].index,inplace=True)
@@ -52,6 +59,11 @@ def test_step(testing_model, files, df_map):
         bboxes = utils.postprocess_boxes(pred_bbox, image_size, cfg.TEST.INPUT_SIZE, cfg.TEST.SCORE_THRESHOLD)
         # non max supression
         bboxes = utils.nms(bboxes, cfg.TEST.IOU_THRESHOLD, method='nms')
+
+
+        #if cfg.TEST.CLASSIFIED_IMAGE_DIR is not None:
+        #    image = utils.draw_bbox(image, bboxes)
+        #    cv2.imwrite(classified_image_dir+'/'+test_filename, image)
  
         for bbox in bboxes:
             # create row for every detected bbox:  img, class, score, bbox iou
@@ -141,51 +153,77 @@ def run(args):
     else:
         # make gpu invisible
         tf.config.experimental.set_visible_devices([], 'GPU')
-    
+   
+    num_classes = len(utils.read_class_names(cfg.YOLO.CLASSES))
     trainset = Dataset('train', batch_size=cfg.TRAIN.BATCH_SIZE)
     logdir = cfg.TRAIN.LOG_DIR 
     steps_per_epoch = len(trainset)
     global_steps = tf.Variable(1, trainable=False, dtype=tf.int64)
     warmup_steps = cfg.TRAIN.WARMUP_EPOCHS * steps_per_epoch
     total_steps = cfg.TRAIN.EPOCHS * steps_per_epoch
-    testset=open(cfg.TRAIN.ANNOT_DIR+'test.txt').read().splitlines()
+    #testset=open(cfg.TRAIN.ANNOT_DIR+'test.txt').read().splitlines()
+
+
+    darknet_input_tensor = tf.keras.layers.Input([
+        cfg.TRAIN.INPUT_SIZE[0],cfg.TRAIN.INPUT_SIZE[0],3])
 
     training_input_tensor = tf.keras.layers.Input([
         cfg.TRAIN.INPUT_SIZE[0],cfg.TRAIN.INPUT_SIZE[0],3])
-    testing_input_tensor = tf.keras.layers.Input([
-        cfg.TEST.INPUT_SIZE,cfg.TEST.INPUT_SIZE,3])
-
-    training_conv_tensors = YOLOv3(training_input_tensor)
-    testing_conv_tensors = YOLOv3(testing_input_tensor)
-
+    #testing_input_tensor = tf.keras.layers.Input([
+    #    cfg.TEST.INPUT_SIZE,cfg.TEST.INPUT_SIZE,3])
+   
+    darknet_conv_tensors = YOLOv3(darknet_input_tensor,80)
+    training_conv_tensors = YOLOv3(training_input_tensor,num_classes)
+    #testing_conv_tensors = YOLOv3(testing_input_tensor,num_classes)
 
     # training model
     training_output_tensors = []
-    testing_output_tensors = []
+    #testing_output_tensors = []
+    darknet_output_tensors = []
+
+    for i, b in enumerate(darknet_conv_tensors):
+        pt = decode(b, i, 80)
+        darknet_output_tensors.append(b)
+        darknet_output_tensors.append(pt)
 
     for i, conv_tensor in enumerate(training_conv_tensors):
-        pred_tensor = decode(conv_tensor, i)
+        pred_tensor = decode(conv_tensor, i, num_classes)
         training_output_tensors.append(conv_tensor)
         training_output_tensors.append(pred_tensor)
+   
+    # testing model 
+    #for i, fm in enumerate(testing_conv_tensors):
+    #    bbox_tensor = decode(fm, i, num_classes)
+    #    testing_output_tensors.append(bbox_tensor)
+
 
     train_model = tf.keras.Model(training_input_tensor, training_output_tensors)
+    #testing_model = tf.keras.Model(testing_input_tensor, testing_output_tensors)
+
     optimizer = tf.keras.optimizers.Adam()
     if os.path.exists(logdir): shutil.rmtree(logdir)
     writer = tf.summary.create_file_writer(logdir)
 
-    # testing model 
-    for i, fm in enumerate(testing_conv_tensors):
-        bbox_tensor = decode(fm, i)
-        testing_output_tensors.append(bbox_tensor)
-
-    testing_model = tf.keras.Model(testing_input_tensor, testing_output_tensors)
-
     # parse arguments
     if args.tld:
-        utils.load_weights(train_model, args.tld)
+        darknet_model = tf.keras.Model(darknet_input_tensor, darknet_output_tensors)
+        utils.load_weights(darknet_model, args.tld)
+        
+        for i, l in enumerate(darknet_model.layers):
+            layer_weights = darknet_model.layers[i].get_weights()
+            if layer_weights != []:
+                try:
+                    train_model.layers[i].set_weights(layer_weights)
+                except:
+                    print("Skiping",train_model.layers[i].name)
+       
+
         freeze_body=1 # 1 = darknet, 2 = all net excet 3 last layers
         num = (185, len(train_model.layers)-3)[freeze_body-1]
-        for i in range(num): train_model.layers[i].trainable = False
+        
+        for i in range(num):
+           train_model.layers[i].trainable = False
+        
         print('Freeze the first {} layers of total {} layers.'.format(num, len(train_model.layers)))
 
     for epoch in range(cfg.TRAIN.EPOCHS):
@@ -214,6 +252,10 @@ def run(args):
 
             # after each epochs 
             if args.map:
+                args.gpu = None
+                test.run(args,epoch)                
+
+                """
 	        # if compute mAP
                 testing_model.load_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
 	
@@ -237,5 +279,5 @@ def run(args):
                         )
  
                     df_map.to_csv(cfg.TRAIN.METRICS_DIR+map_filename+'.csv')
-
+                """
             

@@ -21,10 +21,11 @@ df_map = pd.DataFrame(columns=['IMAGE',
 
 
 
-def run(args):
+def run(args,epoch):
    
     global df_map
 
+   
     if args.gpu:
         gpus = tf.config.experimental.list_physical_devices('GPU')
         tf.config.experimental.set_memory_growth(gpus[0], True)
@@ -33,16 +34,18 @@ def run(args):
             gpus[0],
                 [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=int(args.gpu))]
                 )
-    else:
-        # make gpu invisible
-        tf.config.experimental.set_visible_devices([], 'GPU')
-
+    #else:
+    #    # make gpu invisible
+    #    tf.config.experimental.set_visible_devices([], 'GPU')
+   
 
 
     INPUT_SIZE   = cfg.TEST.INPUT_SIZE 
     NUM_CLASS    = len(utils.read_class_names(cfg.YOLO.CLASSES))
     CLASSES      = utils.read_class_names(cfg.YOLO.CLASSES)
     TRAIN_SIZE   = len(open(cfg.TRAIN.ANNOT_DIR+'train.txt').readlines())
+    trainset=open(cfg.TRAIN.ANNOT_DIR+'train.txt').read().splitlines()
+    testset=open(cfg.TRAIN.ANNOT_DIR+'test.txt').read().splitlines()
 
     classified_stats_dir = cfg.TEST.CLASSIFIED_STATS_DIR
     groundtruth_stats_dir = cfg.TEST.GROUNDTRUTH_STATS_DIR
@@ -58,11 +61,11 @@ def run(args):
 
     # Build Model
     input_layer  = tf.keras.layers.Input([INPUT_SIZE, INPUT_SIZE, 3])
-    feature_maps = YOLOv3(input_layer)
+    feature_maps = YOLOv3(input_layer, NUM_CLASS)
 
     bbox_tensors = []
     for i, fm in enumerate(feature_maps):
-        bbox_tensor = decode(fm, i)
+        bbox_tensor = decode(fm, i, NUM_CLASS)
         bbox_tensors.append(bbox_tensor)
 
     model = tf.keras.Model(input_layer, bbox_tensors)
@@ -79,6 +82,10 @@ def run(args):
             bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[1:]])
             test_filename = line.split(" ")[0]
             test_bboxes_gt = line.split(" ")[1:]
+
+
+            # delete all entrys of current file from traing_results
+            df_map.drop(df_map[df_map.IMAGE == test_filename].index,inplace=True)
 
 
             if len(bbox_data_gt) == 0:
@@ -149,11 +156,20 @@ def run(args):
                         'BBOXGT':test_bbox_gt_class_len }, ignore_index=True )    # BBOX
 
 
+    map_filename = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_test_mAP'.format(
+        epoch+1
+        ,args.warmupepochs
+        ,args.epochs
+        ,len(trainset)
+        ,len(testset)
+        ,args.batchsize
+        )
+
     df_map = utils.preprocess_map(df_map, tp_th=0.5)
     utils.plot_map(df_map, 
-        cfg.TRAIN.METRICS_DIR+'test_mAP.png',
+        cfg.TRAIN.METRICS_DIR+map_filename+'.png',
         10,
         NUM_CLASS 
         )
     
-    df_map.to_csv(cfg.TRAIN.METRICS_DIR+'test_mAP.csv')
+    df_map.to_csv(cfg.TRAIN.METRICS_DIR+map_filename+'.csv')
