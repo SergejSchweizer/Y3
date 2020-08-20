@@ -30,10 +30,7 @@ pandarallel.initialize()
 def test_step(testing_model, files, df_map):
 
     CLASSES      = utils.read_class_names(cfg.YOLO.CLASSES)
-    #classified_image_dir = cfg.TEST.CLASSIFIED_IMAGE_DIR
-    #classified_stats_dir = cfg.TEST.CLASSIFIED_STATS_DIR
-    #groundtruth_stats_dir = cfg.TEST.GROUNDTRUTH_STATS_DIR
-
+    
     # run model for metrics collections
     for f in files:
         test_filename = f.split(" ")[0]
@@ -45,8 +42,6 @@ def test_step(testing_model, files, df_map):
         # delete all entrys of current file from traing_results
         df_map.drop(df_map[df_map.IMAGE == test_filename].index,inplace=True)
 
-        #print(test_bboxes_gt)
-        #print('test_filename {}, test_bboxes: {} '.format(test_filename,test_bboxes_gt))
         image = cv2.imread(test_filename)
         image_size = image.shape[:2]
         image_data = utils.image_preporcess(image, [cfg.TEST.INPUT_SIZE, cfg.TEST.INPUT_SIZE])
@@ -60,11 +55,7 @@ def test_step(testing_model, files, df_map):
         # non max supression
         bboxes = utils.nms(bboxes, cfg.TEST.IOU_THRESHOLD, method='nms')
 
-
-        #if cfg.TEST.CLASSIFIED_IMAGE_DIR is not None:
-        #    image = utils.draw_bbox(image, bboxes)
-        #    cv2.imwrite(classified_image_dir+'/'+test_filename, image)
- 
+         
         for bbox in bboxes:
             # create row for every detected bbox:  img, class, score, bbox iou
             test_bbox_gt_class  = [ np.array(x.split(',')[:4], dtype=np.int) for x in test_bboxes_gt if int(x.split(',')[4]) == bbox[5] ]
@@ -169,16 +160,12 @@ def run(args):
 
     training_input_tensor = tf.keras.layers.Input([
         cfg.TRAIN.INPUT_SIZE[0],cfg.TRAIN.INPUT_SIZE[0],3])
-    #testing_input_tensor = tf.keras.layers.Input([
-    #    cfg.TEST.INPUT_SIZE,cfg.TEST.INPUT_SIZE,3])
-   
+       
     darknet_conv_tensors = YOLOv3(darknet_input_tensor,80)
     training_conv_tensors = YOLOv3(training_input_tensor,num_classes)
-    #testing_conv_tensors = YOLOv3(testing_input_tensor,num_classes)
 
     # training model
     training_output_tensors = []
-    #testing_output_tensors = []
     darknet_output_tensors = []
 
     for i, b in enumerate(darknet_conv_tensors):
@@ -191,14 +178,7 @@ def run(args):
         training_output_tensors.append(conv_tensor)
         training_output_tensors.append(pred_tensor)
    
-    # testing model 
-    #for i, fm in enumerate(testing_conv_tensors):
-    #    bbox_tensor = decode(fm, i, num_classes)
-    #    testing_output_tensors.append(bbox_tensor)
-
-
     train_model = tf.keras.Model(training_input_tensor, training_output_tensors)
-    #testing_model = tf.keras.Model(testing_input_tensor, testing_output_tensors)
 
     optimizer = tf.keras.optimizers.Adam()
     if os.path.exists(logdir): shutil.rmtree(logdir)
@@ -214,11 +194,12 @@ def run(args):
             if layer_weights != []:
                 try:
                     train_model.layers[i].set_weights(layer_weights)
+                    #print("weights loaded",train_model.layers[i].name)
                 except:
-                    print("Skiping",train_model.layers[i].name)
+                    print("Skiping weights loading",train_model.layers[i].name)
        
 
-        freeze_body=1 # 1 = darknet, 2 = all net excet 3 last layers
+        freeze_body=int(args.freezebody) # 1 = darknet, 2 = all net excet 3 last layers
         num = (185, len(train_model.layers)-3)[freeze_body-1]
         
         for i in range(num):
@@ -255,29 +236,5 @@ def run(args):
                 args.gpu = None
                 test.run(args,epoch)                
 
-                """
-	        # if compute mAP
-                testing_model.load_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
-	
-                df_map = test_step(testing_model, testset, df_map) 
-                df_map = utils.preprocess_map(df_map, tp_th=0.5)
 
-                if df_map is not None:
-                    map_filename = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_test_mAP'.format(
-                        epoch+1
-                        ,args.warmupepochs
-                        ,args.epochs
-                        ,len(trainset)
-                        ,len(testset)
-                        ,args.batchsize
-                        )
 
-                    utils.plot_map(df_map,
-                        cfg.TRAIN.METRICS_DIR+map_filename+'.png',
-                        10,
-                        len(utils.read_class_names(cfg.YOLO.CLASSES))
-                        )
- 
-                    df_map.to_csv(cfg.TRAIN.METRICS_DIR+map_filename+'.csv')
-                """
-            

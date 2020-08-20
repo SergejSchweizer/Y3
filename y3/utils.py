@@ -74,6 +74,11 @@ def preprocess_map(df_map, tp_th=0.5):
 
 def plot_map(df_map, path, num_classes, uniq_classes ):
 
+    if df_map is None:
+        print("df_map is None")
+        return   
+ 
+    
     if ( 'R_ALL' in df_map.columns\
         and 'P_ALL' in df_map.columns \
         and len(df_map.index.values) != 0 ):

@@ -85,7 +85,8 @@ def run(args,epoch):
 
 
             # delete all entrys of current file from traing_results
-            df_map.drop(df_map[df_map.IMAGE == test_filename].index,inplace=True)
+            if not df_map is None:
+                df_map.drop(df_map[df_map.IMAGE == test_filename].index,inplace=True)
 
 
             if len(bbox_data_gt) == 0:
@@ -155,21 +156,22 @@ def run(args,epoch):
                         'BBOXPR':test_bbox_class_len, #BBOXPR
                         'BBOXGT':test_bbox_gt_class_len }, ignore_index=True )    # BBOX
 
+    if df_map.size > 0:
+        map_filename = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_tld{}_fb{}_test_mAP'.format(
+            epoch+1
+            ,args.warmupepochs
+            ,args.epochs
+            ,len(trainset)
+            ,len(testset)
+            ,args.batchsize
+            ,1 if args.tld else 0
+            ,args.freezebody
+            )
+        df_map = utils.preprocess_map(df_map, tp_th=0.5)
 
-    map_filename = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_test_mAP'.format(
-        epoch+1
-        ,args.warmupepochs
-        ,args.epochs
-        ,len(trainset)
-        ,len(testset)
-        ,args.batchsize
-        )
-
-    df_map = utils.preprocess_map(df_map, tp_th=0.5)
-    utils.plot_map(df_map, 
-        cfg.TRAIN.METRICS_DIR+map_filename+'.png',
-        10,
-        NUM_CLASS 
-        )
-    
-    df_map.to_csv(cfg.TRAIN.METRICS_DIR+map_filename+'.csv')
+        utils.plot_map(df_map, 
+            cfg.TRAIN.METRICS_DIR+map_filename+'.png',
+            10,
+            NUM_CLASS 
+            )
+        df_map.to_csv(cfg.TRAIN.METRICS_DIR+map_filename+'.csv')
