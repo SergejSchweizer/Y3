@@ -38,6 +38,7 @@ __C.TRAIN.LOG_DIR             = __C.TRAIN.DIR+"log/"
 __C.TRAIN.WEIGHTS_DIR         = __C.TRAIN.DIR+"weights/"
 __C.TRAIN.METRICS_DIR         = __C.TRAIN.DIR+'metrics/'
 __C.TRAIN.ANNOT_DIR           = __C.TRAIN.DIR+"conf/"
+__C.TRAIN.EXPORTS_DIR         = __C.TRAIN.DIR+"exports/"
 __C.TRAIN.BATCH_SIZE          = 10 
 #TRAIN_INPUT_SIZE            = [320, 352, 384, 416, 448, 480, 512, 544, 576, 608]
 __C.TRAIN.INPUT_SIZE          = [416]

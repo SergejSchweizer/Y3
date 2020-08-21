@@ -27,6 +27,7 @@ df_map = pd.DataFrame(columns=['IMAGE',
 
 pandarallel.initialize()
 
+
 def test_step(testing_model, files, df_map):
 
     CLASSES      = utils.read_class_names(cfg.YOLO.CLASSES)
@@ -147,13 +148,13 @@ def run(args):
    
     num_classes = len(utils.read_class_names(cfg.YOLO.CLASSES))
     trainset = Dataset('train', batch_size=cfg.TRAIN.BATCH_SIZE)
+    trset = open(cfg.TRAIN.ANNOT_DIR+'train.txt').read().splitlines()
+    teset = open(cfg.TRAIN.ANNOT_DIR+'test.txt').read().splitlines()
     logdir = cfg.TRAIN.LOG_DIR 
     steps_per_epoch = len(trainset)
     global_steps = tf.Variable(1, trainable=False, dtype=tf.int64)
     warmup_steps = cfg.TRAIN.WARMUP_EPOCHS * steps_per_epoch
     total_steps = cfg.TRAIN.EPOCHS * steps_per_epoch
-    #testset=open(cfg.TRAIN.ANNOT_DIR+'test.txt').read().splitlines()
-
 
     darknet_input_tensor = tf.keras.layers.Input([
         cfg.TRAIN.INPUT_SIZE[0],cfg.TRAIN.INPUT_SIZE[0],3])
@@ -185,9 +186,9 @@ def run(args):
     writer = tf.summary.create_file_writer(logdir)
 
     # parse arguments
-    if args.tld:
+    if args.transferlearning:
         darknet_model = tf.keras.Model(darknet_input_tensor, darknet_output_tensors)
-        utils.load_weights(darknet_model, args.tld)
+        utils.load_weights(darknet_model, args.transferlearning)
         
         for i, l in enumerate(darknet_model.layers):
             layer_weights = darknet_model.layers[i].get_weights()
@@ -198,9 +199,8 @@ def run(args):
                 except:
                     print("Skiping weights loading",train_model.layers[i].name)
        
-
-        freeze_body=int(args.freezebody) # 1 = darknet, 2 = all net excet 3 last layers
-        num = (185, len(train_model.layers)-3)[freeze_body-1]
+        #1 - no, 2 = darknet, 3 = all net except 3 last layers
+        num = (0, 185, len(train_model.layers)-3)[int(args.freezebody)-1]
         
         for i in range(num):
            train_model.layers[i].trainable = False
@@ -209,8 +209,7 @@ def run(args):
 
     for epoch in range(cfg.TRAIN.EPOCHS):
         tf.print("=> EPOCH %i OF %i STARTED " % (epoch+1, cfg.TRAIN.EPOCHS))
-
-        all_files = []
+        
         # for batchsize
         for image_data, target, files in trainset:
             total_loss =train_step(image_data, 
@@ -223,18 +222,40 @@ def run(args):
                       total_steps,
                       epoch+1
                       )
-
-            all_files.extend(files)
+        #prefix = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_tl{}_fb{}_'.format(
+        prefix = 'we{}_e{}_tr{}_te{}_bs{}_tl{}_fb{}_'.format(
+            #epoch+1,
+            args.warmupepochs,
+            args.epochs,
+            len(trset),
+            len(teset),
+            args.batchsize,
+            1 if args.transferlearning else 0,
+            args.freezebody
+            )
 
         # save weights after each epoch
         if not math.isnan(total_loss):
             train_model.save_weights(cfg.TRAIN.WEIGHTS_DIR+'Y3')
 
-
             # after each epochs 
             if args.map:
                 args.gpu = None
-                test.run(args,epoch)                
+                test.run(args,epoch,prefix)                
+
+        # save model with trained weights after each epoch
+        if args.export:
+            #tf.keras.models.save_model(
+            tf.saved_model.save(
+                    train_model,
+                    os.path.join(cfg.TRAIN.EXPORTS_DIR,prefix,'1')
+                    #overwrite=True
+                    #include_optimizer=True,
+                    #save_format=None,
+                    #signatures=None,
+                    #options=None
+                    )
+
 
 
 

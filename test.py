@@ -21,7 +21,7 @@ df_map = pd.DataFrame(columns=['IMAGE',
 
 
 
-def run(args,epoch):
+def run(args,epoch,prefix_filename):
    
     global df_map
 
@@ -157,21 +157,15 @@ def run(args,epoch):
                         'BBOXGT':test_bbox_gt_class_len }, ignore_index=True )    # BBOX
 
     if df_map.size > 0:
-        map_filename = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_tld{}_fb{}_test_mAP'.format(
-            epoch+1
-            ,args.warmupepochs
-            ,args.epochs
-            ,len(trainset)
-            ,len(testset)
-            ,args.batchsize
-            ,1 if args.tld else 0
-            ,args.freezebody
-            )
+
+        p = os.path.join(cfg.TRAIN.METRICS_DIR,prefix_filename)
+        if not os.path.exists(p): os.makedirs(p)
+
         df_map = utils.preprocess_map(df_map, tp_th=0.5)
 
         utils.plot_map(df_map, 
-            cfg.TRAIN.METRICS_DIR+map_filename+'.png',
+            p+'/epoch'+str(epoch+1)+'_test_mAP.png',
             10,
             NUM_CLASS 
             )
-        df_map.to_csv(cfg.TRAIN.METRICS_DIR+map_filename+'.csv')
+        df_map.to_csv(p+'/epoch'+str(epoch+1)+'_test_mAP.csv')

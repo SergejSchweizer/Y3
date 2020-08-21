@@ -12,8 +12,8 @@ ENV_Y3_DIR  = 'Y3_DIR'
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--testpath",help="Absolut path to Y3 data dir")
 parser.add_argument("--trainpath",help="Absolute path to Y3 data dir")
-parser.add_argument("--tld", help="Use transfer learing for darknet, train the rest")
-parser.add_argument("--freezebody", help="which part of Model to freeze, 1 - darknet, 2 - all - 3",nargs='?',const=1, choices = ['1','2'])
+parser.add_argument("--transferlearning", help="Use transfer learing, path to the weights ")
+parser.add_argument("--freezebody", help="which part of Model to freeze, 1 - no freeze, 2 - darknet, 3 - all - 3",nargs='?',const=1, choices = ['1','2','3'])
 
 
 parser.add_argument("--gpu", help="Use local GPU with certain max amount of GPU memory in MB",nargs='?',const=1500)
@@ -21,6 +21,7 @@ parser.add_argument("--map", help="compute mAP and save as image", default=False
 parser.add_argument("--batchsize", help="Which batch to use in training, default=10",nargs='?',const=10)
 parser.add_argument("--warmupepochs", help="Increasing learnig rate at the beginning",nargs='?',const=2)
 parser.add_argument("--epochs", help="How many epcohs should we train",nargs='?',const=10)
+parser.add_argument("--export", help="Export model after each epoch", default=False, action='store_true')
 
 
 
@@ -34,7 +35,7 @@ if args.trainpath:
         os.environ[ENV_Y3_DIR] = args.trainpath
 
         # create dedicated directory
-        training_subdir = ['log','weights','stats','metrics']
+        training_subdir = ['logs','weights','stats','metrics','exports']
         if not os.path.exists(args.trainpath):
             os.mkdir(args.trainpath)
 
