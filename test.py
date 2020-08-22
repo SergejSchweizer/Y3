@@ -169,3 +169,17 @@ def run(args,epoch,prefix_filename):
             NUM_CLASS 
             )
         df_map.to_csv(p+'/epoch'+str(epoch+1)+'_test_mAP.csv')
+
+
+    # save model with trained weights after each epoch
+    if args.export:
+        #tf.keras.models.save_model(
+        tf.saved_model.save(
+            model,
+            os.path.join(cfg.TRAIN.EXPORTS_DIR,prefix_filename,'1')
+            #overwrite=True
+            #include_optimizer=True,
+            #save_format=None,
+            #signatures=None,
+            #options=None
+           )

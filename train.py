@@ -243,19 +243,3 @@ def run(args):
                 args.gpu = None
                 test.run(args,epoch,prefix)                
 
-        # save model with trained weights after each epoch
-        if args.export:
-            #tf.keras.models.save_model(
-            tf.saved_model.save(
-                    train_model,
-                    os.path.join(cfg.TRAIN.EXPORTS_DIR,prefix,'1')
-                    #overwrite=True
-                    #include_optimizer=True,
-                    #save_format=None,
-                    #signatures=None,
-                    #options=None
-                    )
-
-
-
-
