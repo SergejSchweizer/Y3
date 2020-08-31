@@ -12,7 +12,7 @@ scriptpath = str(pathlib.Path(__file__).parent.absolute())+'/'
 
 if not ENV_Y3_DIR in os.environ:
     print('ERROR: ENV Variable {} does not exist.'.format(ENV_Y3_DIR))
-    exit(1)
+     
 else:
     if ENV_Y3_DIR in os.environ: y3path  = os.environ[ENV_Y3_DIR]
 

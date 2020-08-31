@@ -328,7 +328,7 @@ def bboxes_iou(boxes1, boxes2):
 
     inter_section = np.maximum(right_down - left_up, 0.0)
     inter_area    = inter_section[..., 0] * inter_section[..., 1]
-    union_area    = boxes1_area + boxes2_area - inter_area
+    union_area    = boxes1_area + boxes2_area - inter_area + 1e-10
     ious          = np.maximum(1.0 * inter_area / union_area, np.finfo(np.float32).eps)
 
     return ious
