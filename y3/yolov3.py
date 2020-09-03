@@ -106,6 +106,7 @@ def bbox_iou(boxes1, boxes2):
     inter_section = tf.maximum(right_down - left_up, 0.0)
     inter_area = inter_section[..., 0] * inter_section[..., 1]
     union_area = boxes1_area + boxes2_area - inter_area
+    #union_area = boxes1_area + boxes2_area - inter_area + 1e-12
 
     #return 1.0 * inter_area / union_area
     return 1.0 * inter_area / tf.maximum(union_area, 1e-12)
@@ -131,6 +132,8 @@ def bbox_giou(boxes1, boxes2):
     inter_section = tf.maximum(right_down - left_up, 0.0)
     inter_area = inter_section[..., 0] * inter_section[..., 1]
     union_area = boxes1_area + boxes2_area - inter_area
+    #union_area = boxes1_area + boxes2_area - inter_area + 1e-12
+
     #iou = inter_area / union_area
     iou = inter_area / tf.maximum(union_area, 1e-12) 
 

@@ -134,7 +134,7 @@ def run(args,epoch,prefix_filename):
                     xmin, ymin, xmax, ymax = list(map(str, coor))
                     bbox_mess = ' '.join([image_path, class_name, xmin, ymin, xmax, ymax, score]) + '\n'
                     f.write(bbox_mess)
-                    print('\t' + str(bbox_mess).strip())
+                    #print('\t' + str(bbox_mess).strip())
                      
 
                     # save metrics
@@ -173,8 +173,8 @@ def run(args,epoch,prefix_filename):
 
     # save model with trained weights after each epoch
     if args.export:
-        #tf.keras.models.save_model(
-        tf.saved_model.save(
+        tf.keras.models.save_model(
+        #tf.saved_model.save(
             model,
             os.path.join(cfg.TRAIN.EXPORTS_DIR,prefix_filename,'1')
             #overwrite=True
