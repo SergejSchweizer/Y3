@@ -1,12 +1,12 @@
 # YOLOv3 Tensorflow2-gpu training and evaluation on 600 Classes from Open Images Dataset V5
 ### with transferlearning, freeze layers, gpu
 ##### Author: Sergej Schweizer (SSC)
-##### The [original yolo3 code](https://github.com/YunYang1994/TensorFlow2.0-Examples/tree/master/4-Object_Detection/YOLOV3) was rewritten and testet with several thousand of classes.
+##### The [original yolo3 code](https://github.com/YunYang1994/TensorFlow2.0-Examples/tree/master/4-Object_Detection/YOLOV3) was rewritten and testet with several thousands of classes.
 ##### Finally this work ended in: https://github.com/SergejSchweizer/Y3
 
 
 ```python
-# The current tensorflow version depneds on:
+# The current tensorflow version depends on:
 #cuda           = 10.0
 #cudnjn         = 7.6.4
 #tensorflow-gpu = 2.0
@@ -17,7 +17,7 @@
 #!pip install pandarallel tensorflow-gpu==2.0
 ```
 
-### Import librarys
+### Import libraries
 
 
 
@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 import pandarallel
 ```
 
-# Prepare Open Images Dataset V6 (Google)
+# Prepare Open Images Dataset V5 (Google)
 
 ### Download Images, Bonding Boxes and Classe Names (take few minutes)
 
@@ -225,7 +225,6 @@ draw_rectangels_to_labeld_images(
 ! git clone https://github.com/SergejSchweizer/Y3.git
 ```
 
-
 ### Download YOLO3 weights from Joseph Redmons Page (May the power....)
 
 
@@ -248,6 +247,15 @@ draw_rectangels_to_labeld_images(
 ```python
  !python Y3/Y3.py --warmupepochs 2 --epochs 5 --gpu 10000 --map --batchsize 5  --trainpath YOLO3_SSC --transferlearning yolov3.weights --freezebody 1 --export
 ```
+
+    => EPOCH:1 STEP 3453   lr: 0.000001   giou_loss: 2.1011   conf_loss: 656.1710   prob_loss: 483.7092   total_loss: 1141.9812 
+    => EPOCH:1 STEP 3454   lr: 0.000001   giou_loss: 2.8979   conf_loss: 664.5010   prob_loss: 613.9684   total_loss: 1281.3674 
+    => EPOCH:1 STEP 3455   lr: 0.000001   giou_loss: 2.0210   conf_loss: 655.8571   prob_loss: 379.4922   total_loss: 1037.3704 
+    => EPOCH:1 STEP 3456   lr: 0.000001   giou_loss: 3.9775   conf_loss: 660.3450   prob_loss: 1137.1315   total_loss: 1801.4539 
+    => EPOCH:1 STEP 3457   lr: 0.000001   giou_loss: 3.2536   conf_loss: 660.4791   prob_loss: 806.0881   total_loss: 1469.8208 
+    => EPOCH:1 STEP 3458   lr: 0.000001   giou_loss: 2.0572   conf_loss: 659.2932   prob_loss: 405.3122   total_loss: 1066.6626 
+    => EPOCH:1 STEP 3459   lr: 0.000001   giou_loss: 2.8047   conf_loss: 659.5377   prob_loss: 566.0484   total_loss: 1228.3909 
+
 
 ### Mean overage Precision
 
