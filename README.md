@@ -1,11 +1,20 @@
-# YOLO3 training on 600 Classes from Open Images Dataset V6
-##### SSC: Sergej Schweizer 04.11.2020
-##### The original yolo3 code was rewritten and testet with several thousand of classes.
+# YOLOv3 Tensorflow2-gpu training and evaluation on 600 Classes from Open Images Dataset V5
+### with transferlearning, freeze layers, gpu
+##### Author: Sergej Schweizer (SSC)
+##### The [original yolo3 code](https://github.com/YunYang1994/TensorFlow2.0-Examples/tree/master/4-Object_Detection/YOLOV3) was rewritten and testet with several thousand of classes.
 ##### Finally this work ended in: https://github.com/SergejSchweizer/Y3
 
 
 ```python
-!pip install pandarallel
+# The current tensorflow version depneds on:
+#cuda           = 10.0
+#cudnjn         = 7.6.4
+#tensorflow-gpu = 2.0
+```
+
+
+```python
+#!pip install pandarallel tensorflow-gpu==2.0
 ```
 
 ### Import librarys
@@ -16,16 +25,13 @@
 import os
 import pandas as pd
 import numpy as np
-#import pillow
 import scipy
-#import wget
-import seaborn
 import easydict
-#import grpcio
 import tensorflow
-import PIL
+from PIL import Image
+from matplotlib.patches import Rectangle
+import matplotlib.pyplot as plt
 import pandarallel
-
 ```
 
 # Prepare Open Images Dataset V6 (Google)
@@ -97,26 +103,26 @@ def get_height_of_img(img):
 
 
 ```python
-annots['LabelIndex'] = annots['LabelName'].apply(get_index_of_class)
+annots.loc[:,'LabelIndex'] = annots.loc[:,'LabelName'].apply(get_index_of_class)
 ```
 
 
 ```python
-annots['ImagePath'] = 'validation/'+annots['ImageID']+'.jpg'
+annots.loc[:,'ImagePath'] = 'test/'+annots.loc[:,'ImageID']+'.jpg'
 ```
 
 
 ```python
-annots['width'] = annots['ImagePath'].apply(get_width_of_img)
-annots['height'] = annots['ImagePath'].apply(get_height_of_img)
+annots.loc[:,'width'] = annots.loc[:,'ImagePath'].apply(get_width_of_img)
+annots.loc[:,'height'] = annots.loc[:,'ImagePath'].apply(get_height_of_img)
 ```
 
 
 ```python
-annots['XMin'] = annots['XMin'].multiply(annots['width']).astype(int)#.astype('str')+','
-annots['XMax'] = annots['XMax'].multiply(annots['width']).astype(int)#.astype('str')+','
-annots['YMin'] = annots['YMin'].multiply(annots['height']).astype(int)#.astype('str')+','
-annots['YMax'] = annots['YMax'].multiply(annots['height']).astype(int)#.astype('str')+','
+annots.loc[:,'XMin'] = annots['XMin'].multiply(annots['width']).astype(int)#.astype('str')+','
+annots.loc[:,'XMax'] = annots['XMax'].multiply(annots['width']).astype(int)#.astype('str')+','
+annots.loc[:,'YMin'] = annots['YMin'].multiply(annots['height']).astype(int)#.astype('str')+','
+annots.loc[:,'YMax'] = annots['YMax'].multiply(annots['height']).astype(int)#.astype('str')+','
 ```
 
 #### Save all annots
@@ -127,16 +133,12 @@ annots = annots.loc[:,['ImagePath', 'XMin', 'YMin', 'XMax', 'YMax','LabelIndex']
 annots.to_csv('annots.csv',index=False, header=False, sep=',')
 ```
 
-
-```python
-annots
-```
-
 ### Save clases.csv
 
 
 ```python
- raw_classes.label.to_csv(train_dir+'/conf/classes.names',index=False, header=False)
+raw_classes.label.to_csv(train_dir+'/conf/classes.names',index=False, header=False)
+classes = raw_classes.label
 ```
 
 
@@ -155,9 +157,63 @@ df_test.to_csv(train_dir+'/conf/test.txt',index=False, header=False,sep=',')
 
 ```
 
+### Draw labels to images, to check if our labels are sized properly
+
 
 ```python
+def draw_rectangels_to_labeld_images(annot_file,save_path, relative_path=False):
 
+    FIG_SIZE=(30,15)
+    
+    annot_file = open(annot_file, "r")
+    annotations = annot_file.read().splitlines()
+
+    # every annotation is leafleat
+    for l in annotations:
+        #print(l)
+        filename = l.split()[0].split('/')[-1][:-3]+'png'
+        pathfilename = l.split()[0]
+        
+        #if relative_path:
+        if relative_path:
+            save_filepath = save_path+os.path.dirname(pathfilename)
+        else:
+            save_filepath = save_path
+
+        if not os.path.exists(save_filepath):
+            os.makedirs(save_filepath)
+           
+      
+        polygons =  [ int(y) for x in str(l.split('jpg ')[1]).split(',') for y in x.split(' ') ] 
+       
+        im = Image.open(pathfilename)
+
+        # Display the image
+        plt.figure(figsize = FIG_SIZE)
+        plt.imshow(im, interpolation='nearest')
+
+        # Get the current reference
+        ax = plt.gca()
+
+        #for polygon in [ polygons[i:i+8] for i in range(0,len(polygons),8) ]:
+        for pol in [ polygons[i:i+5] for i in range(0,len(polygons),5) ]:
+            #pol = [ int(p) for p in pol]
+            #print(pol)
+            rect = Rectangle( (pol[0], pol[1]), int(pol[2]-pol[0]), int(pol[3]-pol[1]),  linewidth=3,edgecolor='r',facecolor='none')
+            ax.text(pol[0], pol[1], classes[pol[4]], color='red')
+            ax.add_patch(rect)
+    
+        plt.savefig(save_filepath+'/'+filename, bbox_inches='tight')
+        plt.close('all')
+        im.close()
+```
+
+
+```python
+draw_rectangels_to_labeld_images(
+            train_dir+'/conf/test.txt'
+            ,train_dir+'/images/labeled'
+            ,relative_path=False)
 ```
 
 # Prepare YOLO3 Framework
@@ -168,6 +224,7 @@ df_test.to_csv(train_dir+'/conf/test.txt',index=False, header=False,sep=',')
 ```python
 ! git clone https://github.com/SergejSchweizer/Y3.git
 ```
+
 
 ### Download YOLO3 weights from Joseph Redmons Page (May the power....)
 
@@ -198,4 +255,3 @@ df_test.to_csv(train_dir+'/conf/test.txt',index=False, header=False,sep=',')
 ```python
 
 ```
-
