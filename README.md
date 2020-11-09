@@ -36,7 +36,7 @@ import pandarallel
 
 # Prepare Open Images Dataset V5 (Google)
 
-### Download Images, Bonding Boxes and Classe Names (take few minutes)
+### Download Images, Bonding Boxes and Classe Names (takes few minutes)
 
 
 ```python
