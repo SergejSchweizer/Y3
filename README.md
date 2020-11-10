@@ -70,7 +70,7 @@ raw_annots = pd.read_csv("test-annotations-bbox.csv")
 raw_classes = pd.read_csv("class-descriptions-boxable.csv", names=["name","label"])
 ```
 
-### Get data from raw_annotations (you can limit it by the slicing at the and)
+### Get data from raw_annotations (you can limit it by slicing[] at the and)
 
 
 ```python
@@ -99,7 +99,7 @@ def get_height_of_img(img):
     return imgs[img][1]
 ```
 
-### Add addtional collumn with label index (take few minutes)
+### Add addtional collumn with 'LabelIndex' (takes few minutes)
 
 
 ```python
