@@ -238,7 +238,7 @@ draw_rectangels_to_labeld_images(
 ###### --map: create mean overage precision csv and png files
 ###### --batchsize: how many images should be computed at once
 ###### --gpu:  use gpu, you can define amount of MB which should be used at the gpu device
-###### --trainpath: path to Y3 directory, which should consist at least of conf (including their content) and images subdirectory
+###### --trainpath: path to Y3 directory, which should consist at least of conf (including train.txt,test.txt and classes.names) and images subdirectory
 ###### --freezebody: 1 - no, 2 = only darknet, 3 = all except 3 last layers
 ###### --exports: export weights for using in rest-api
 ###### --transferlearing: define weights file, which will be loaded at the beginning
