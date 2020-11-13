@@ -257,7 +257,7 @@ draw_rectangels_to_labeld_images(
     => EPOCH:1 STEP 3459   lr: 0.000001   giou_loss: 2.8047   conf_loss: 659.5377   prob_loss: 566.0484   total_loss: 1228.3909 
 
 
-### Mean average Precision
+### Mean Average Precision
 
 
 ```python
