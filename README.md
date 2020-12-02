@@ -52,10 +52,8 @@ We need to create at least conf and images subdirectorys, other subdirectorys wi
 
 
 ```python
-train_dir = '/exports/DATA/Y3_openimageV5/'
-code_dir = '/home/sergej/'
-#train_dir = 'Y3_openimageV5/'
-#code_dir = 'Y3'
+train_dir = 'Y3_openimageV5/'
+code_dir = 'Y3'
 for p in ['conf','images']:
     if not os.path.exists(train_dir+'/'+p):
         os.makedirs(train_dir+'/'+p, exist_ok=True)
@@ -325,7 +323,6 @@ def draw_rectangels_to_labeld_images(annot_file,save_path, relative_path=False):
 
 
 ```python
-train_dir = '/exports/DATA/Y3_openimageV5/'
 draw_rectangels_to_labeld_images(
             train_dir+'/conf/test.txt'
             ,train_dir+'/images/labeled'
