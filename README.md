@@ -357,7 +357,7 @@ You need root permissions to install packages
 !wget -q https://pjreddie.com/media/files/yolov3.weights
 ```
 
-##### 11.3 Y3 Command line options
+##### 11.4 Y3 Command line options
 * --warmupepochs:  the number of initial epochs during which the sizes of the 5 boxes in each cell is forced to match the sizes of the 5 anchors, this trick seems to improve precision emperically
 * --epochs: number of epochs
 * --map: create mean overage precision csv and png files
