@@ -40,15 +40,15 @@ warnings.filterwarnings("ignore")
 #### 2. Y3 working path.
 ---
 
-Withhin this path all the data will be stored in subdirectorys.
+Within this path all the data will be stored in subdirectorys.
 E.g: 
-* annotations - subdir:conf
-* classified images - subdir:images
-* model exports - subdir:exports
-* computed weights - subidr:weights
-* computerd mAP - subdir:metrics
+* annotations - subdir: conf
+* classified images - subdir: images
+* model exports - subdir: exports
+* computed weights - subidr: weights
+* computerd mAP - subdir: metrics
 
-We need to create at least conf and images subdirectorys, other subdirectorys will be created depnding on the trainig options of the YOLO3 model
+We need to create at least conf and images subdirectorys, other subdirectorys will be created depending on the trainig options of the YOLO3 model
 
 
 ```python
@@ -64,7 +64,7 @@ for p in ['conf','images']:
 %cd $train_dir'conf'
 ```
 
-#### 3. Download annotatoins, labels and images (this can take a while)
+#### 3. Download annotations, labels and images (this can take a while)
 ---
 
 
