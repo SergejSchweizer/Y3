@@ -383,7 +383,7 @@ Following statements can be made based on the mAP:
 * check failure summs for every image (remove outliers)
 ![Mean Average Precision](https://github.com/SergejSchweizer/Y3/blob/master/mAP/OpenImageV5/epoch7_test_mAP.png?raw=true)
 
-#### 12. Image with predicted Classes
+#### 13. Image with predicted Classes
 Some Inference examples form Open Images Dataset V5 
 
 ![Image with predicted Classes](https://github.com/SergejSchweizer/Y3/blob/master/mAP/OpenImageV5/0be39faa9d07e343.jpg?raw=true)
