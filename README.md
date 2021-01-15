@@ -387,3 +387,4 @@ Following statements can be made based on the mAP:
 Some Inference examples form Open Images Dataset V5 
 
 ![Image with predicted Classes](https://github.com/SergejSchweizer/Y3/blob/master/mAP/OpenImageV5/0be39faa9d07e343.jpg?raw=true)
+![Image with predicted Classes](https://github.com/SergejSchweizer/Y3/blob/master/mAP/OpenImageV5/0d623eeb602617be.jpg?raw=true)
