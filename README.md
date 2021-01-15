@@ -376,13 +376,14 @@ The performance of object localization and classification is measured through th
 
 Following statements can be made based on the mAP:
 * the more annotatins of certain class - the better performance
-* also the label quality plays a role (e.g. Vehicle has 1080 annots, but mAP is only 0.029)
+* also label quality plays a role (e.g. Vehicle has 1080 annots, but mAP is only 0.029)
 * use only classes with at least 300 annots.
 * check whether labels are set correct
 * improve data-augmentation
 * check failure summs for every image (remove outliers)
 ![Mean Average Precision](https://github.com/SergejSchweizer/Y3/blob/master/mAP/OpenImageV5/epoch7_test_mAP.png?raw=true)
 
-```python
+#### 12. Image with predicted Classes
+Some Inference examples form Open Images Dataset V5 
 
-```
+![Image with predicted Classes](https://github.com/SergejSchweizer/Y3/blob/master/mAP/OpenImageV5/0be39faa9d07e343.jpg?raw=true)
