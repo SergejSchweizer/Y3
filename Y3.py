@@ -54,7 +54,7 @@ elif args.testpath :
         args.testpath = args.testpath+'/' if not args.testpath.endswith('/') else args.testpath 
         
         import test 
-        test.run(args)
+        test.run(args,0,'manual_run')
 
 else:
     print("File does not exist"+args.trainpath+'/conf/config.py')

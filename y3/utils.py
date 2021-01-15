@@ -32,14 +32,14 @@ def preprocess_map(df_map, tp_th=0.5):
         df_map = df_map.sort_values('SCORE', ascending=False)
                                                                 
         # TP,FP
-        df_map['TP']  = df_map['IOU'].parallel_map(gtt)
-        df_map['FP']  = df_map['IOU'].parallel_map(ltt)
+        df_map['TP']  = df_map['IOU'].apply(gtt)
+        df_map['FP']  = df_map['IOU'].apply(ltt)
                                                                                             
         # CUM TP
         df_map['CUM_TP'] = df_map['TP'].cumsum()
         df_map['CUM_FP'] = df_map['FP'].cumsum()
-                                                                                                              # bboxes are per image and class from annotations files
-        df_map['CUM_GT']    = df_map.drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
+        # bboxes are per image and class from annotations files
+        df_map['CUM_GT']    = df_map.drop_duplicates(subset = ["IMAGE","CLASS"])['GT'].sum()
 
         df_map['P_ALL']  = df_map['CUM_TP'] / ( df_map['CUM_TP'] + df_map['CUM_FP'] )
         df_map['R_ALL']  = df_map['CUM_TP'] / df_map['CUM_GT'] 
@@ -49,10 +49,11 @@ def preprocess_map(df_map, tp_th=0.5):
         df_map['CUM_TP_CLASS' ] = df_map.groupby(['CLASS'])['TP'].cumsum()
         df_map['CUM_FP_CLASS' ] = df_map.groupby(['CLASS'])['FP'].cumsum()
 
+        # compute mAP for unique classes
         for class_ in df_map.CLASS.unique():
             # CUM_GT_CLASS (gt)
             df_map.loc[ (df_map.CLASS == class_, 'CUM_GT_CLASS')] = \
-            df_map.loc[ (df_map.CLASS == class_)].drop_duplicates(subset = ["IMAGE","CLASS"])['BBOXGT'].sum()
+            df_map.loc[ (df_map.CLASS == class_)].drop_duplicates(subset = ["IMAGE","CLASS"])['GT'].sum()
 
             # P_CLASS
             df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')] = \
@@ -69,7 +70,35 @@ def preprocess_map(df_map, tp_th=0.5):
             np.trapz( df_map.loc[ (df_map.CLASS == class_, 'P_CLASS')],\
             df_map.loc[ (df_map.CLASS == class_, 'R_CLASS')] )
 
-        df_map = df_map.sort_values('AUC_CLASS', ascending=False)
+        #df_map['CUM_TP_IMAGE' ] = df_map.groupby(['IMAGE'])['TP'].cumsum()
+        #df_map['CUM_FP_IMAGE' ] = df_map.groupby(['IMAGE'])['FP'].cumsum()
+
+          
+        # compute mAP for unique images
+        """
+        for class_ in df_map.IMAGE.unique():
+            # CUM_GT_IMAGE (gt)
+            df_map.loc[ (df_map.IMAGE == class_, 'CUM_GT_IMAGE')] = \
+            df_map.loc[ (df_map.IMAGE == class_)].drop_duplicates(subset = ["IMAGE"])['GT'].sum()
+
+            # P_IMAGE
+            df_map.loc[ (df_map.IMAGE == class_, 'P_IMAGE')] = \
+            df_map.loc[ (df_map.IMAGE == class_, 'CUM_TP_IMAGE') ] / \
+            ( df_map.loc[ (df_map.IMAGE == class_, 'CUM_TP_IMAGE') ] + \
+            df_map.loc[ (df_map.IMAGE == class_, 'CUM_FP_IMAGE') ] )
+
+            # R_IMAGE
+            df_map.loc[ (df_map.IMAGE == class_, 'R_IMAGE')] = \
+            df_map.loc[ (df_map.IMAGE == class_, 'CUM_TP_IMAGE') ] / \
+            df_map.loc[ (df_map.IMAGE == class_, 'CUM_GT_IMAGE')]
+
+            df_map.loc[ (df_map.IMAGE == class_, 'AUC_IMAGE')] = \
+            np.trapz( df_map.loc[ (df_map.IMAGE == class_, 'P_IMAGE')],\
+            df_map.loc[ (df_map.IMAGE == class_, 'R_IMAGE')] )
+        """
+        
+        #df_map = df_map.sort_values('AUC_CLASS', ascending=False)
+        
         return df_map
 
 def plot_map(df_map, path, num_classes, uniq_classes ):
@@ -83,7 +112,6 @@ def plot_map(df_map, path, num_classes, uniq_classes ):
         and 'P_ALL' in df_map.columns \
         and len(df_map.index.values) != 0 ):
 
-    
         df_map = df_map.sort_values('AUC_CLASS', ascending=False)
 	    
         legends_list = []
@@ -329,6 +357,8 @@ def bboxes_iou(boxes1, boxes2):
     inter_section = np.maximum(right_down - left_up, 0.0)
     inter_area    = inter_section[..., 0] * inter_section[..., 1]
     union_area    = boxes1_area + boxes2_area - inter_area + 1e-10
+    #union_area    = boxes1_area + boxes2_area - inter_area
+
     ious          = np.maximum(1.0 * inter_area / union_area, np.finfo(np.float32).eps)
 
     return ious

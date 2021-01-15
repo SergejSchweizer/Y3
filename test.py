@@ -25,7 +25,11 @@ def run(args,epoch,prefix_filename):
    
     global df_map
 
-   
+    # if manuall test run, then use cpu, and all annotations
+    if prefix_filename == 'manual_run': 
+        cfg.TEST.ANNOT_PATH = cfg.TRAIN.ANNOT_DIR+'all.txt'
+        tf.config.experimental.set_visible_devices([], 'GPU')
+
     if args.gpu:
         gpus = tf.config.experimental.list_physical_devices('GPU')
         tf.config.experimental.set_memory_growth(gpus[0], True)
@@ -34,11 +38,6 @@ def run(args,epoch,prefix_filename):
             gpus[0],
                 [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=int(args.gpu))]
                 )
-    #else:
-    #    # make gpu invisible
-    #    tf.config.experimental.set_visible_devices([], 'GPU')
-   
-
 
     INPUT_SIZE   = cfg.TEST.INPUT_SIZE 
     NUM_CLASS    = len(utils.read_class_names(cfg.YOLO.CLASSES))
@@ -50,6 +49,7 @@ def run(args,epoch,prefix_filename):
     classified_stats_dir = cfg.TEST.CLASSIFIED_STATS_DIR
     groundtruth_stats_dir = cfg.TEST.GROUNDTRUTH_STATS_DIR
     classified_image_dir = cfg.TEST.CLASSIFIED_IMAGE_DIR
+
 
     if os.path.exists(classified_stats_dir): shutil.rmtree(classified_stats_dir)
     if os.path.exists(groundtruth_stats_dir): shutil.rmtree(groundtruth_stats_dir)
@@ -77,6 +77,7 @@ def run(args,epoch,prefix_filename):
             annotation = line.strip().split()
             image_path = annotation[0]
             image_name = image_path.split('/')[-1]
+            date_prefix = image_path[34:49]
             image = cv2.imread(image_path)
             #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # gives blue filter
             bbox_data_gt = np.array([list(map(int, box.split(','))) for box in annotation[1:]])
@@ -122,7 +123,8 @@ def run(args,epoch,prefix_filename):
 
             if cfg.TEST.CLASSIFIED_IMAGE_DIR is not None:
                 image = utils.draw_bbox(image, bboxes)
-                cv2.imwrite(classified_image_dir+'/'+image_name, image)
+                if not os.path.exists(classified_image_dir+date_prefix): os.makedirs(classified_image_dir+date_prefix)
+                cv2.imwrite(classified_image_dir+date_prefix+image_name, image)
 
             with open(predict_result_path, 'w') as f:
                 for bbox in bboxes:
@@ -134,9 +136,8 @@ def run(args,epoch,prefix_filename):
                     xmin, ymin, xmax, ymax = list(map(str, coor))
                     bbox_mess = ' '.join([image_path, class_name, xmin, ymin, xmax, ymax, score]) + '\n'
                     f.write(bbox_mess)
-                    #print('\t' + str(bbox_mess).strip())
+                    print('\t' + str(bbox_mess).strip())
                      
-
                     # save metrics
                     test_bbox_gt_class  = [ np.array(x.split(',')[:4], dtype=np.int) \
                             for x in test_bboxes_gt if int(x.split(',')[4]) == bbox[5] ]
@@ -145,30 +146,38 @@ def run(args,epoch,prefix_filename):
                     # bboxes per image from annotations
                     test_bbox_class_len = len(test_bbox_class )
                     # compute max iou for current clas
-                    max_iou_class = max( [ utils.bboxes_iou(bb,bbox[:4]) for bb in test_bbox_gt_class ] or [0]     )
 
+                    max_iou_class =  pd.DataFrame(
+                        [ [utils.bboxes_iou(bb, coor), bb,  coor] for bb in test_bbox_gt_class ] or [[0,0,coor]]
+                        ,columns=['IOU','BBOXGT','BBOXPR'] 
+                        )
+                   
+                    max_iou_class = max_iou_class.iloc[max_iou_class['IOU'].idxmax()]#.values.tolist()
 
                     df_map = df_map.append({
                         'IMAGE':test_filename, # IMAGE
                         'CLASS':class_name , # CÖASS
                         'SCORE':bbox[4], # SCORE
-                        'IOU':max_iou_class, # IOU
-                        'BBOXPR':test_bbox_class_len, #BBOXPR
-                        'BBOXGT':test_bbox_gt_class_len }, ignore_index=True )    # BBOX
-
+                        'IOU':max_iou_class.IOU, # IOU
+                        'BBOXPR':max_iou_class.BBOXPR,
+                        'BBOXGT':max_iou_class.BBOXGT,
+                        'PR':test_bbox_class_len, # COUNT PR
+                        'GT':test_bbox_gt_class_len }, ignore_index=True )    # COUNT GT
+                    
     if df_map.size > 0:
 
         p = os.path.join(cfg.TRAIN.METRICS_DIR,prefix_filename)
         if not os.path.exists(p): os.makedirs(p)
 
-        df_map = utils.preprocess_map(df_map, tp_th=0.5)
+        df_map = utils.preprocess_map(df_map, tp_th=0.75)
 
         utils.plot_map(df_map, 
             p+'/epoch'+str(epoch+1)+'_test_mAP.png',
             10,
             NUM_CLASS 
             )
-        df_map.to_csv(p+'/epoch'+str(epoch+1)+'_test_mAP.csv')
+        df_map.to_csv(p+'/epoch'+str(epoch+1)+'_test_mAP.csv'
+            ,index=False)
 
 
     # save model with trained weights after each epoch

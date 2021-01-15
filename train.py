@@ -223,7 +223,7 @@ def run(args):
                       epoch+1
                       )
         #prefix = 'ce{}_we{}_e{}_tr{}_te{}_bs{}_tl{}_fb{}_'.format(
-        prefix = 'we{}_e{}_tr{}_te{}_bs{}_tl{}_fb{}_'.format(
+        prefix = 'we{}_e{}_tr{}_te{}_bs{}_tl{}_fb{}_train_iou_th{}_score_th{}_test_iou_th'.format(
             #epoch+1,
             args.warmupepochs,
             args.epochs,
@@ -232,6 +232,9 @@ def run(args):
             args.batchsize,
             1 if args.transferlearning else 0,
             args.freezebody
+            ,cfg.YOLO.IOU_LOSS_THRESH
+            ,cfg.TEST.SCORE_THRESHOLD
+            ,cfg.TEST.IOU_THRESHOLD 
             )
 
         # save weights after each epoch

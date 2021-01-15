@@ -31,7 +31,7 @@ __C.YOLO.CLASSES              = y3path+"conf/classes.names"
 __C.YOLO.ANCHORS              = scriptpath+"anchors.txt"
 __C.YOLO.STRIDES              = [8, 16, 32]
 __C.YOLO.ANCHOR_PER_SCALE     = 3
-__C.YOLO.IOU_LOSS_THRESH      = 0.3
+__C.YOLO.IOU_LOSS_THRESH      = 0.5
 
 # Train options
 __C.TRAIN.LOG_DIR             = __C.TRAIN.DIR+"log/"
@@ -57,5 +57,5 @@ __C.TEST.CLASSIFIED_IMAGE_DIR = __C.TEST.DIR+"images/classified"
 __C.TEST.GROUNDTRUTH_IMAGE_DIR= __C.TEST.DIR+"images/groundtruth"
 __C.TEST.CLASSIFIED_STATS_DIR = __C.TEST.DIR+"stats/classified"
 __C.TEST.GROUNDTRUTH_STATS_DIR= __C.TEST.DIR+"stats/groundtruth"
-__C.TEST.SCORE_THRESHOLD      = 0.30
-__C.TEST.IOU_THRESHOLD        = 0.30
+__C.TEST.SCORE_THRESHOLD      = 0.3
+__C.TEST.IOU_THRESHOLD        = 0.5
